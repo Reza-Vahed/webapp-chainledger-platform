@@ -112,15 +112,23 @@ Output:
 
 ### Documented test address (acceptance test)
 
-We recommend `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (`vitalik.eth`) -
-one of the most publicly documented Ethereum addresses (ENS-linked, widely
-cited). **Transparency note:** we could not programmatically verify the
-exact current transaction count from this environment (Etherscan's address
-page loads it dynamically), and it is known to be a high-activity address
-(likely several thousand transactions), not strictly "moderate". This
-still makes it a strong test case since it genuinely exercises pagination
-and rate-limit handling - but the run will take longer and use more of
-your daily API quota than a smaller address.
+`0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (`vitalik.eth`) - one of the
+most publicly documented Ethereum addresses (ENS-linked, widely cited).
+
+**Verified with a real run (2026-07-13):** this address turned out to be
+far more active than "moderate" - **446,829 transactions** processed
+end-to-end without errors (254,699 Transfer-In, 174,330 Transfer-Out,
+11,939 Swap, 5,090 Contract-Interaktion, 771 Unklassifiziert). The first
+live run actually surfaced a real bug: Etherscan's free tier enforced
+`3 req/s` in practice (not the `5 req/s` we had assumed from the docs),
+and our rate-limit detection only matched the exact phrase
+`"Max rate limit reached"`, missing the real-world variant
+`"Max calls per sec rate limit reached (3/sec)"`. This caused already
+page 10 of 9,000+ fetched records to be discarded instead of retried.
+Fixed by broadening the match and lowering the default to `3 req/s`
+(see `docs/adr/0002-api-choice.md` and `src/api_client/etherscan_client.py`).
+A high-volume address like this one is actually a good stress test for
+pagination and rate-limit handling for exactly this reason.
 
 If you prefer a faster smoke test, use any wallet address of your own
 choosing with a lower transaction count - check the count on the address's

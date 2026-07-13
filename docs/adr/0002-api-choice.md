@@ -24,8 +24,14 @@ gekapselt; `EtherscanClient` ist eine austauschbare Implementierung.
 
 ## Begründung
 
-- Kostenloser Tier ausreichend (5 Requests/Sekunde, 100.000/Tag) für ein
-  Einzel-Wallet-CLI-Tool.
+- Kostenloser Tier ausreichend (100.000 Requests/Tag) für ein
+  Einzel-Wallet-CLI-Tool. Das tatsächliche Sekunden-Limit wich im Live-Test
+  von der ursprünglich angenommenen Dokumentation ab (beobachtet:
+  `"Max calls per sec rate limit reached (3/sec)"` statt der angenommenen
+  5/s) - der Client-Default wurde daraufhin auf 3 req/s gesenkt und das
+  Retry-Handling korrigiert (siehe `src/api_client/etherscan_client.py`,
+  `_is_rate_limited`), da der ursprüngliche Marker-String diese konkrete
+  Fehlermeldungsvariante nicht erkannt hatte.
 - Gut dokumentiert, De-facto-Standard für Ethereum-Block-Explorer-Daten;
   auch von etablierten Steuer-Tools (Blockpit, CoinTracking) selbst genutzt -
   erleichtert den späteren manuellen Abgleich.

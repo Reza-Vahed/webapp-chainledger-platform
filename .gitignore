@@ -10,11 +10,13 @@ venv/
 .pytest_cache/
 *.egg-info/
 
-# Laufzeitdaten (Audit-Artefakte enthalten ggf. wallet-bezogene Daten -> nicht versionieren)
+# Laufzeitdaten (Audit-Artefakte/Logs enthalten wallet-bezogene Daten -> nicht versionieren)
 data/raw/*
 data/processed/*
+data/logs/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/logs/.gitkeep
 
 # Editor
 .vscode/

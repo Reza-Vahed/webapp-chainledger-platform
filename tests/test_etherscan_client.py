@@ -119,6 +119,27 @@ def test_rate_limit_retry_then_success(monkeypatch):
     assert session.get.call_count == 2
 
 
+def test_rate_limit_retry_recognizes_calls_per_sec_variant(monkeypatch):
+    """Regression: Etherscan liefert live u. a. 'Max calls per sec rate
+    limit reached (3/sec)' statt der urspruenglich angenommenen exakten
+    Formulierung 'Max rate limit reached'. Ein zu enger Marker hat das
+    live uebersehen und dadurch bereits erfolgreich abgerufene Seiten
+    komplett verworfen statt zu retryen (siehe Live-Testlauf)."""
+    monkeypatch.setattr("src.api_client.etherscan_client.time.sleep", lambda _seconds: None)
+    session = MagicMock()
+    tx = {"hash": "0xabc", "blockNumber": "100"}
+    session.get.side_effect = [
+        make_response({"status": "0", "message": "NOTOK", "result": "Max calls per sec rate limit reached (3/sec)"}),
+        make_response({"status": "1", "message": "OK", "result": [tx]}),
+    ]
+    client = make_client(session, max_retries=3)
+
+    results = client.fetch_transactions("0xWallet", "normal")
+
+    assert results == [tx]
+    assert session.get.call_count == 2
+
+
 def test_rate_limit_exceeded_raises_after_max_retries(monkeypatch):
     monkeypatch.setattr("src.api_client.etherscan_client.time.sleep", lambda _seconds: None)
     session = MagicMock()

@@ -122,17 +122,27 @@ Ausgabe:
 
 ### Dokumentierte Test-Adresse (Akzeptanztest)
 
-Empfohlen: `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (`vitalik.eth`) -
-eine der öffentlich am besten dokumentierten Ethereum-Adressen
-(ENS-verknüpft, breit zitiert). **Transparenzhinweis:** Die exakte
-aktuelle Transaktionszahl konnte von dieser Umgebung aus nicht
-programmatisch verifiziert werden (Etherscans Adress-Seite lädt sie
-dynamisch nach), und die Adresse ist bekanntermaßen sehr aktiv
-(vermutlich mehrere Tausend Transaktionen) - damit nicht streng
-"moderat". Sie eignet sich dennoch gut als Testfall, da sie Pagination
-und Rate-Limit-Handling tatsächlich fordert - der Lauf dauert dafür
-länger und verbraucht mehr vom täglichen API-Kontingent als eine
-kleinere Adresse.
+`0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (`vitalik.eth`) - eine der
+öffentlich am besten dokumentierten Ethereum-Adressen (ENS-verknüpft,
+breit zitiert).
+
+**Verifiziert mit einem echten Lauf (13.07.2026):** Diese Adresse ist
+deutlich aktiver als "moderat" - **446.829 Transaktionen** wurden
+fehlerfrei durchgängig verarbeitet (254.699 Transfer-In, 174.330
+Transfer-Out, 11.939 Swap, 5.090 Contract-Interaktion, 771
+Unklassifiziert). Der erste Live-Lauf hat dabei einen echten Bug
+aufgedeckt: Das kostenlose Etherscan-Tier hat in der Praxis `3 req/s`
+durchgesetzt (nicht die aus der Dokumentation angenommenen `5 req/s`),
+und unsere Rate-Limit-Erkennung hat nur exakt auf
+`"Max rate limit reached"` gematcht - die real aufgetretene Variante
+`"Max calls per sec rate limit reached (3/sec)"` wurde dadurch nicht
+erkannt. Dadurch wurden bereits erfolgreich abgerufene 9.000+ Datensätze
+auf Seite 10 verworfen statt retryed zu werden. Behoben durch einen
+breiteren Substring-Abgleich und einen konservativeren Default von
+`3 req/s` (siehe `docs/adr/0002-api-choice.md` und
+`src/api_client/etherscan_client.py`). Eine derart aktive Adresse ist
+gerade deshalb ein guter Stresstest für Pagination und
+Rate-Limit-Handling.
 
 Für einen schnelleren Funktionstest eignet sich jede selbst gewählte
 Wallet-Adresse mit weniger Transaktionen - die Anzahl lässt sich vorab

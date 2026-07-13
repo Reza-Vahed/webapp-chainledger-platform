@@ -72,7 +72,7 @@ class EtherscanClient(BlockchainDataSource):
         api_key: str,
         base_url: str = DEFAULT_BASE_URL,
         chain_id: int = DEFAULT_CHAIN_ID,
-        rate_limit_rps: float = 5.0,
+        rate_limit_rps: float = 3.0,
         page_size: int = DEFAULT_PAGE_SIZE,
         max_retries: int = 5,
         base_backoff_seconds: float = 1.0,
@@ -110,7 +110,7 @@ class EtherscanClient(BlockchainDataSource):
             api_key=api_key,
             base_url=os.environ.get("ETHERSCAN_BASE_URL", cls.DEFAULT_BASE_URL),
             chain_id=int(os.environ.get("ETHERSCAN_CHAIN_ID", cls.DEFAULT_CHAIN_ID)),
-            rate_limit_rps=float(os.environ.get("ETHERSCAN_RATE_LIMIT_RPS", 5.0)),
+            rate_limit_rps=float(os.environ.get("ETHERSCAN_RATE_LIMIT_RPS", 3.0)),
         )
 
     def fetch_transactions(
@@ -243,7 +243,14 @@ class EtherscanClient(BlockchainDataSource):
     def _is_rate_limited(data: dict[str, Any]) -> bool:
         if data.get("status") != "0":
             return False
-        marker = "max rate limit reached"
+        # Bewusst auf den gemeinsamen Kern-Teilstring geprueft, nicht auf die
+        # exakte Formulierung: Etherscan verwendet je nach Limit-Typ leicht
+        # unterschiedliche Meldungen, u. a. "Max rate limit reached" UND
+        # "Max calls per sec rate limit reached (3/sec)" (live beobachtet -
+        # ein zu enger exakter Marker hat dieses zweite Format uebersehen und
+        # dadurch einen erfolgreichen Teil-Abruf faelschlich als harten
+        # Fehler behandelt statt zu retryen).
+        marker = "rate limit reached"
         message = str(data.get("message", "")).lower()
         result = str(data.get("result", "")).lower()
         return marker in message or marker in result

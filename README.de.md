@@ -1,0 +1,152 @@
+# ChainLedger Platform - On-Chain-Datenimport-Agent (MVP)
+
+🇬🇧 [English version](README.md)
+
+Ein strikt read-only CLI-Tool, das On-Chain-Transaktionsdaten direkt von
+öffentlichen Ethereum-Wallet-Adressen abruft, in ein kanonisches Modell
+normalisiert, nach einer festen steuerlich relevanten Kategorienliste
+klassifiziert, offensichtliche Datenprobleme markiert und als CSV + JSON
+für den manuellen Abgleich mit Krypto-Steuer-Tools (z. B. Blockpit,
+CoinTracking) exportiert.
+
+Dies ist ein Portfolio-/technisches Validierungsprojekt, **keine**
+Steuersoftware.
+
+## Was dieses Tool NICHT tut
+
+- Keine UI, keine Datenbank, keine Multi-Chain-Unterstützung, keine
+  KI-Komponenten (MVP-Scope)
+- Keine Steuerberechnung, keine FIFO-/Anschaffungskosten-Logik - es
+  bereitet Daten nur auf
+- Keine NFT-Transfers (ERC-721/1155) - außerhalb des MVP-Scope
+- Signiert oder sendet niemals Transaktionen; verarbeitet niemals private
+  Keys, Seed-Phrasen oder Exchange-Zugangsdaten - strikt read-only, nur
+  öffentliche Daten
+- Rät niemals: Mehrdeutige Fälle (z. B. Kauf-/Verkauf-Richtung bei einem
+  DEX-Swap) werden immer als `Swap` oder `Unklassifiziert` eingestuft,
+  niemals stillschweigend angenommen
+
+## Architektur
+
+```
+EtherscanClient (src/api_client/)  ->  rohes JSON (data/raw/, unveraendert)
+        |
+        v
+normalize_transactions (src/normalizer.py)  ->  CanonicalTransaction (pydantic)
+        |
+        v
+classify_transactions (src/classifier.py)   ->  feste Kategorie + Konfidenz
+        |
+        v
+validate_transactions (src/validator.py)    ->  markiert offensichtliche Fehler/Luecken
+        |
+        v
+export_transactions (src/exporter.py)       ->  data/processed/*.csv + *.json
+```
+
+Orchestriert durch `src/cli.py`. Die Datenquelle ist hinter
+`BlockchainDataSource` (`src/api_client/base.py`) gekapselt, sodass
+Etherscan später gegen einen anderen Anbieter ausgetauscht werden kann,
+ohne den Rest der Pipeline anzufassen. Die Begründung dieser Entscheidungen
+steht in `docs/adr/`.
+
+## Klassifikations-Kategorien
+
+Feste, abschließende Liste (siehe `src/models.py::TxCategory`):
+`Transfer-In`, `Transfer-Out`, `Swap`, `Staking-Reward`, `Airdrop`,
+`Contract-Interaktion`, `Unklassifiziert`.
+
+- **Swap-Erkennung** gruppiert alle Records mit demselben `tx_hash` und
+  sucht nach Mehr-Leg-Mustern (z. B. ERC-20-Out + ETH-In). Die
+  Kauf-/Verkauf-Richtung wird nie unterstellt.
+- **Staking-Reward / Airdrop** werden nur bei Treffer auf eine kleine,
+  explizite Allowlist bekannter Contracts vergeben (`src/classifier.py`).
+  Alles andere bleibt `Transfer-In`/`Unklassifiziert` statt geraten zu
+  werden. Bekannte Einschränkung: Rebase-Liquid-Staking-Token (z. B.
+  stETH) erzeugen nicht immer klassische Transfer-Events, wodurch Rewards
+  daraus über die Account-API u. U. nicht vollständig erfasst werden -
+  zur manuellen Prüfung markiert.
+- Jede Zeile trägt `confidence` (0.0-1.0) und eine `warnings`-Liste (z. B.
+  `manual_review_required`, `data_gap_or_error`) - nie stillschweigend
+  verworfen.
+
+## Voraussetzungen
+
+- Python 3.11+
+- Kostenloser Etherscan-API-Key: https://etherscan.io/apis
+
+## Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+
+cp .env.example .env
+# dann .env öffnen und ETHERSCAN_API_KEY=<dein Key> eintragen
+```
+
+## Tests ausführen
+
+```bash
+pytest tests/ -v
+```
+
+40 automatisierte Tests decken den API-Client (Pagination, Rate-Limit-
+Retry, Fehlerbehandlung), Normalizer, Classifier, Validator, Exporter und
+den Rohdaten-Persistenz-Hook ab.
+
+## Beispielaufruf
+
+```bash
+python -m src.cli 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+```
+
+Mehrere Wallets in einem Lauf:
+
+```bash
+python -m src.cli 0xAdresse1... 0xAdresse2...
+```
+
+Optionale Flags: `--env-file`, `--raw-dir`, `--processed-dir`, `--log-dir`
+(Defaults: `data/raw/`, `data/processed/`, `data/logs/` im Projekt-Root -
+siehe `python -m src.cli --help`).
+
+Ausgabe:
+- `data/raw/<run_id>_<adresse>_<kategorie>_page<N>.json` - unveränderte
+  rohe API-Antworten (Audit-Trail, Anforderung: Quelldaten nie verändern)
+- `data/processed/transactions_<run_id>.csv` und `.json` - normalisierte,
+  klassifizierte, validierte Transaktionen
+- `data/logs/run_<run_id>.log` - API-Aufrufe, Rate-Limit-Ereignisse,
+  Warnungen
+
+### Dokumentierte Test-Adresse (Akzeptanztest)
+
+Empfohlen: `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (`vitalik.eth`) -
+eine der öffentlich am besten dokumentierten Ethereum-Adressen
+(ENS-verknüpft, breit zitiert). **Transparenzhinweis:** Die exakte
+aktuelle Transaktionszahl konnte von dieser Umgebung aus nicht
+programmatisch verifiziert werden (Etherscans Adress-Seite lädt sie
+dynamisch nach), und die Adresse ist bekanntermaßen sehr aktiv
+(vermutlich mehrere Tausend Transaktionen) - damit nicht streng
+"moderat". Sie eignet sich dennoch gut als Testfall, da sie Pagination
+und Rate-Limit-Handling tatsächlich fordert - der Lauf dauert dafür
+länger und verbraucht mehr vom täglichen API-Kontingent als eine
+kleinere Adresse.
+
+Für einen schnelleren Funktionstest eignet sich jede selbst gewählte
+Wallet-Adresse mit weniger Transaktionen - die Anzahl lässt sich vorab
+auf der Etherscan-Adressseite prüfen
+(`https://etherscan.io/address/<adresse>`, Reiter "Transactions").
+
+## Daten & Datenschutz (DSGVO)
+
+Alles läuft und verbleibt lokal. `data/raw/` und `data/processed/` sind
+standardmäßig in `.gitignore`, da sie wallet-bezogene Transaktionsdaten
+enthalten können. Es werden keine Zugangsdaten außer dem eigenen
+Etherscan-API-Key gespeichert (über `.env`, niemals committet).
+
+## Dokumentation
+
+- Architecture Decision Records: `docs/adr/0001-tech-stack.md`,
+  `0002-api-choice.md`, `0003-output-format.md`

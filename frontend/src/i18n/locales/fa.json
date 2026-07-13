@@ -1,0 +1,87 @@
+{
+  "app": {
+    "title": "ChainLedger Platform"
+  },
+  "addressForm": {
+    "label": "آدرس کیف‌پول اتریوم",
+    "placeholder": "0x...",
+    "validationError": "لطفاً یک آدرس معتبر اتریوم وارد کنید (0x + 40 کاراکتر هگزادسیمال).",
+    "submit": "شروع ایمپورت",
+    "submitting": "در حال اجرا…"
+  },
+  "errors": {
+    "importStartFailed": "شروع ایمپورت با خطا مواجه شد.",
+    "statusFetchFailed": "دریافت وضعیت با خطا مواجه شد.",
+    "transactionsFetchFailed": "دریافت تراکنش‌ها با خطا مواجه شد."
+  },
+  "jobProgress": {
+    "statusLabel": "وضعیت: {{state}}",
+    "stageLabel": "مرحله: {{stage}}",
+    "errorLabel": "خطا: {{error}}",
+    "transactionsCount_one": "{{count}} تراکنش",
+    "transactionsCount_other": "{{count}} تراکنش",
+    "pagesCount_one": "{{count}} صفحه",
+    "pagesCount_other": "{{count}} صفحه",
+    "summaryProcessed_one": "انجام شد: {{count}} تراکنش پردازش شد",
+    "summaryProcessed_other": "انجام شد: {{count}} تراکنش پردازش شد",
+    "summaryUnclassified_one": "– {{count}} مورد از آن‌ها طبقه‌بندی‌نشده (بررسی دستی توصیه می‌شود).",
+    "summaryUnclassified_other": "– {{count}} مورد از آن‌ها طبقه‌بندی‌نشده (بررسی دستی توصیه می‌شود)."
+  },
+  "state": {
+    "queued": "در صف انتظار",
+    "running": "در حال اجرا",
+    "done": "انجام شد",
+    "error": "خطا"
+  },
+  "stage": {
+    "fetching": "در حال دریافت داده‌ها",
+    "classifying": "در حال طبقه‌بندی",
+    "validating": "در حال اعتبارسنجی",
+    "exporting": "در حال ایجاد خروجی"
+  },
+  "recordType": {
+    "normal": "تراکنش‌های عادی",
+    "internal": "انتقال‌های داخلی",
+    "erc20": "انتقال‌های توکن ERC-20"
+  },
+  "category": {
+    "Transfer-In": "انتقال ورودی",
+    "Transfer-Out": "انتقال خروجی",
+    "Swap": "سواپ",
+    "Staking-Reward": "پاداش استیکینگ",
+    "Airdrop": "ایردراپ",
+    "Contract-Interaktion": "تعامل با قرارداد",
+    "Unklassifiziert": "طبقه‌بندی‌نشده"
+  },
+  "results": {
+    "categoryLabel": "دسته‌بندی",
+    "allCategories": "همه",
+    "minConfidence": "حداقل اطمینان",
+    "search": "جستجو (هش/آدرس)",
+    "downloadCsv": "دانلود CSV",
+    "downloadJson": "دانلود JSON",
+    "columnTimestamp": "زمان",
+    "columnCategory": "دسته‌بندی",
+    "columnAmount": "مبلغ",
+    "columnConfidence": "اطمینان",
+    "columnBlock": "بلاک",
+    "columnDirection": "جهت",
+    "columnToken": "توکن",
+    "columnTxHash": "هش تراکنش",
+    "columnWarnings": "هشدارها",
+    "directionIn": "ورودی",
+    "directionOut": "خروجی",
+    "loading": "در حال بارگذاری…",
+    "empty": "نتیجه‌ای برای این فیلترها یافت نشد.",
+    "prevPage": "→ قبلی",
+    "nextPage": "بعدی ←",
+    "pageIndicator": "صفحه {{page}} از {{totalPages}} ({{total}} نتیجه)"
+  },
+  "theme": {
+    "switchToDark": "فعال‌سازی حالت تاریک",
+    "switchToLight": "فعال‌سازی حالت روشن"
+  },
+  "language": {
+    "label": "تغییر زبان"
+  }
+}

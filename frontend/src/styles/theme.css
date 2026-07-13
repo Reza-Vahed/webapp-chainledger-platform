@@ -84,9 +84,16 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Tahoma, sans-serif;
   background: var(--bg);
   color: var(--fg);
+}
+
+/* Persisches Schriftbild: system-ui-Stacks decken Farsi-Glyphen meist ab,
+   Tahoma als zusaetzlicher Fallback fuer Systeme ohne modernen Arabic/
+   Persian-faehigen Default-Sans (kein externer Font-Download noetig). */
+:root[dir="rtl"] body {
+  font-family: Tahoma, "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .app {
@@ -107,6 +114,12 @@ body {
   margin: 0;
 }
 
+.app__header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .theme-toggle {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -114,6 +127,16 @@ body {
   width: 2.5rem;
   height: 2.5rem;
   font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.language-switcher {
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 0.85rem;
   cursor: pointer;
 }
 

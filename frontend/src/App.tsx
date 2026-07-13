@@ -1,12 +1,15 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AddressForm } from "./components/AddressForm";
 import { JobProgress } from "./components/JobProgress";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { ResultsTable } from "./components/ResultsTable";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ApiError, createImport } from "./api/client";
 import { useJobPolling } from "./hooks/useJobPolling";
 
 function App() {
+  const { t } = useTranslation();
   const [jobId, setJobId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { status, pollError } = useJobPolling(jobId);
@@ -19,15 +22,18 @@ function App() {
       const created = await createImport([address]);
       setJobId(created.job_id);
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : "Import konnte nicht gestartet werden.");
+      setSubmitError(err instanceof ApiError ? err.message : t("errors.importStartFailed"));
     }
   }
 
   return (
     <div className="app">
       <header className="app__header">
-        <h1>ChainLedger Platform</h1>
-        <ThemeToggle />
+        <h1>{t("app.title")}</h1>
+        <div className="app__header-controls">
+          <LanguageSwitcher />
+          <ThemeToggle />
+        </div>
       </header>
 
       <main>

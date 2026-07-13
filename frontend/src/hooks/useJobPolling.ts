@@ -3,6 +3,7 @@
 // - einfachste robuste Loesung fuer ein MVP ohne zusaetzliche Infrastruktur.
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ApiError, getImportStatus } from "../api/client";
 import type { JobStatusResponse } from "../types";
 
@@ -14,6 +15,7 @@ interface UseJobPollingResult {
 }
 
 export function useJobPolling(jobId: string | null): UseJobPollingResult {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<JobStatusResponse | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -39,7 +41,7 @@ export function useJobPolling(jobId: string | null): UseJobPollingResult {
         }
       } catch (err) {
         if (cancelled) return;
-        const message = err instanceof ApiError ? err.message : "Status konnte nicht abgerufen werden.";
+        const message = err instanceof ApiError ? err.message : t("errors.statusFetchFailed");
         setPollError(message);
       }
     }
@@ -52,6 +54,7 @@ export function useJobPolling(jobId: string | null): UseJobPollingResult {
         window.clearTimeout(timerRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t() bewusst nicht in deps: neue Sprache soll laufendes Polling nicht neu starten
   }, [jobId]);
 
   return { status, pollError };

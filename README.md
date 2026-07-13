@@ -162,12 +162,82 @@ Good illustration of why a single "moderate" test address isn't enough on
 its own to judge classification quality - activity patterns vary a lot
 by wallet age and usage style.
 
+## Web Frontend (Phase 2)
+
+A React + TypeScript SPA (`frontend/`) sits on top of a thin FastAPI wrapper
+(`api/`) around the same pipeline described above - no logic is duplicated;
+CLI and web app share `src/` unchanged.
+
+- **Trilingual UI** (German/English/Farsi) with a language switcher.
+  Default language: German. Farsi renders right-to-left (`dir="rtl"`),
+  including mirrored table columns and direction-appropriate pagination
+  arrows. Dates are always shown in the Gregorian calendar with Western
+  digits in every language (forced via a Unicode locale extension) so the
+  displayed dates always match the Gregorian timestamps in the CSV/JSON
+  exports - the browser's default for `fa` would otherwise silently switch
+  to the Persian calendar and Persian digits, which would be confusing to
+  cross-reference against the export files.
+- Light/dark theme toggle (persisted in `localStorage`).
+- Enter a wallet address, watch live per-category progress (polling every
+  1.5 s - chosen over SSE/WebSocket as the simplest robust option for an
+  MVP), then browse results in a paginated, filterable, sortable table
+  with CSV/JSON download links.
+- The Etherscan API key never reaches the browser - only the FastAPI
+  backend talks to Etherscan, using the same `.env` as the CLI.
+
+### Backend setup
+
+```bash
+source .venv/bin/activate               # from the project root
+pip install -r requirements-dev.txt     # includes fastapi, uvicorn, httpx
+uvicorn api.main:app --reload --port 8000
+```
+
+### Frontend setup
+
+```bash
+cd frontend
+npm install
+cp .env.example .env    # VITE_API_BASE_URL, default http://localhost:8000
+npm run dev
+```
+
+Open http://localhost:5173/. Both servers must run at the same time (two
+separate processes in this MVP - no combined single-command startup yet,
+and no Docker packaging yet either, though `api/` and `frontend/` are kept
+as separate directories/processes specifically so that's a small addition
+later rather than a restructure).
+
+### API endpoints (backend)
+
+| Method & path | Purpose |
+|---|---|
+| `POST /api/v1/imports` | Start an import job for one or more addresses |
+| `GET /api/v1/imports/{id}` | Job status + per-category progress (for polling) |
+| `GET /api/v1/imports/{id}/transactions` | Paginated/filtered/sorted results |
+| `GET /api/v1/imports/{id}/export/{csv,json}` | Download the generated export |
+
+Known MVP limitation (documented, not solved): job state lives in the
+backend process's memory only - no persistence across restarts, no
+multi-worker support. Acceptable for a single-user demo tool without
+accounts; a database would be over-engineering at this stage.
+
+### Backend tests
+
+```bash
+pytest tests/test_api_imports.py tests/test_cli.py -v
+```
+
+Uses FastAPI's `TestClient` with a fake Etherscan client - no network
+calls, no API key needed to run these.
+
 ## Data & privacy (GDPR)
 
 Everything runs and stays local. `data/raw/` and `data/processed/` are
 git-ignored by default since they may contain wallet-linked transaction
 data. No credentials other than your own Etherscan API key (via `.env`,
-never committed) are stored anywhere.
+never committed) are stored anywhere - this applies identically to the CLI
+and the web backend, which read the same `.env` file.
 
 ## Documentation
 

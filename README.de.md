@@ -180,12 +180,83 @@ nicht ausreicht, um die Klassifikationsqualität zu beurteilen -
 Aktivitätsmuster unterscheiden sich stark je nach Alter und Nutzungsstil
 der Wallet.
 
+## Web-Frontend (Phase 2)
+
+Eine React+TypeScript-SPA (`frontend/`) sitzt auf einem schlanken
+FastAPI-Wrapper (`api/`) um dieselbe oben beschriebene Pipeline auf - keine
+doppelte Logik, CLI und Web-App teilen sich unverändert `src/`.
+
+- **Dreisprachige UI** (Deutsch/Englisch/Farsi) mit Sprachumschalter,
+  Default: Deutsch. Farsi wird rechts-nach-links dargestellt (`dir="rtl"`),
+  inklusive gespiegelter Tabellenspalten und richtungsgerechter
+  Pagination-Pfeile. Daten werden in allen Sprachen konsequent im
+  gregorianischen Kalender mit westlichen Ziffern angezeigt (erzwungen
+  über eine Unicode-Locale-Extension) - ohne das würde der Browser bei
+  "fa" automatisch auf den persischen Kalender und persische Ziffern
+  umschalten, was beim Abgleich mit den CSV/JSON-Exporten (immer
+  gregorianisch) verwirrend wäre.
+- Light/Dark-Theme-Umschalter (persistiert in `localStorage`).
+- Wallet-Adresse eingeben, Live-Fortschritt pro Kategorie beobachten
+  (Polling alle 1,5 s - bewusst statt SSE/WebSocket als einfachste
+  robuste MVP-Lösung gewählt), danach Ergebnisse in einer paginierten,
+  filterbaren, sortierbaren Tabelle mit CSV-/JSON-Download durchsuchen.
+- Der Etherscan-API-Key erreicht nie den Browser - nur das FastAPI-Backend
+  spricht mit Etherscan, über dieselbe `.env` wie die CLI.
+
+### Backend-Setup
+
+```bash
+source .venv/bin/activate               # im Projekt-Root
+pip install -r requirements-dev.txt     # enthält fastapi, uvicorn, httpx
+uvicorn api.main:app --reload --port 8000
+```
+
+### Frontend-Setup
+
+```bash
+cd frontend
+npm install
+cp .env.example .env    # VITE_API_BASE_URL, Default http://localhost:8000
+npm run dev
+```
+
+Dann http://localhost:5173/ öffnen. Beide Server müssen gleichzeitig
+laufen (zwei getrennte Prozesse in diesem MVP - noch kein kombinierter
+Start-Befehl und noch kein Docker-Packaging, `api/` und `frontend/` sind
+aber bewusst als getrennte Verzeichnisse/Prozesse angelegt, damit das
+später eine kleine Ergänzung statt eines Umbaus ist).
+
+### API-Endpunkte (Backend)
+
+| Methode & Pfad | Zweck |
+|---|---|
+| `POST /api/v1/imports` | Startet Job für 1+ Adressen |
+| `GET /api/v1/imports/{id}` | Job-Status + Fortschritt pro Kategorie (fürs Polling) |
+| `GET /api/v1/imports/{id}/transactions` | Paginierte/gefilterte/sortierte Ergebnisse |
+| `GET /api/v1/imports/{id}/export/{csv,json}` | Download des erzeugten Exports |
+
+Bekannte MVP-Grenze (dokumentiert, nicht gelöst): Job-Status lebt nur im
+Speicher des Backend-Prozesses - keine Persistenz über Neustarts hinweg,
+kein Multi-Worker-Support. Für ein Einzelnutzer-Demo-Tool ohne
+Nutzerkonten ausreichend; eine Datenbank wäre an dieser Stelle
+Over-Engineering.
+
+### Backend-Tests
+
+```bash
+pytest tests/test_api_imports.py tests/test_cli.py -v
+```
+
+Nutzt FastAPIs `TestClient` mit einem Fake-Etherscan-Client - keine
+echten Netzwerkaufrufe, kein API-Key zum Ausführen nötig.
+
 ## Daten & Datenschutz (DSGVO)
 
 Alles läuft und verbleibt lokal. `data/raw/` und `data/processed/` sind
 standardmäßig in `.gitignore`, da sie wallet-bezogene Transaktionsdaten
 enthalten können. Es werden keine Zugangsdaten außer dem eigenen
-Etherscan-API-Key gespeichert (über `.env`, niemals committet).
+Etherscan-API-Key gespeichert (über `.env`, niemals committet) - das gilt
+identisch für CLI und Web-Backend, die dieselbe `.env`-Datei lesen.
 
 ## Dokumentation
 

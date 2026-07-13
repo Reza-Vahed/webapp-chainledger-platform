@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ApiError, exportUrl, getImportTransactions } from "../api/client";
 import type { TransactionsPage } from "../types";
 
-// Feste Kategorienliste (siehe src/models.py::TxCategory) - Farbzuordnung
+// Feste Kategorienliste (siehe src/models.py::TxCategory) - Werte bleiben
+// die kanonischen deutschen Backend-Strings (Filter-Query-Param!), nur die
+// ANGEZEIGTEN Labels werden uebersetzt (t(`category.${key}`)). Farbzuordnung
 // per fester Reihenfolge (Slot 1-7 der validierten Dataviz-Palette,
 // niemals rotiert), siehe theme.css .category-pill--slot-*.
 const CATEGORY_SLOT: Record<string, number> = {
@@ -16,13 +19,14 @@ const CATEGORY_SLOT: Record<string, number> = {
 };
 const CATEGORIES = Object.keys(CATEGORY_SLOT);
 
-const SORTABLE_COLUMNS: { key: string; label: string }[] = [
-  { key: "timestamp", label: "Zeitstempel" },
-  { key: "category", label: "Kategorie" },
-  { key: "amount", label: "Betrag" },
-  { key: "confidence", label: "Confidence" },
-  { key: "block_number", label: "Block" },
-];
+const SORTABLE_COLUMNS = ["timestamp", "category", "amount", "confidence", "block_number"] as const;
+const COLUMN_LABEL_KEYS: Record<(typeof SORTABLE_COLUMNS)[number], string> = {
+  timestamp: "results.columnTimestamp",
+  category: "results.columnCategory",
+  amount: "results.columnAmount",
+  confidence: "results.columnConfidence",
+  block_number: "results.columnBlock",
+};
 
 const PAGE_SIZE = 25;
 
@@ -31,6 +35,13 @@ interface ResultsTableProps {
 }
 
 export function ResultsTable({ jobId }: ResultsTableProps) {
+  const { t, i18n } = useTranslation();
+  // Gregorianischer Kalender + westliche Ziffern fuer ALLE Sprachen (auch
+  // Farsi) erzwungen: Ohne dieses Unicode-Extension-Tag liefert der
+  // Browser fuer "fa" automatisch den persischen (Jalali) Kalender mit
+  // persischen Ziffern - das wuerde vom Gregorianischen Datum in den
+  // CSV/JSON-Exporten abweichen und waere fuer den Abgleich verwirrend.
+  const dateLocaleTag = `${i18n.language}-u-ca-gregory-nu-latn`;
   const [category, setCategory] = useState("");
   const [minConfidence, setMinConfidence] = useState("");
   const [search, setSearch] = useState("");
@@ -66,7 +77,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setLoadError(err instanceof ApiError ? err.message : "Transaktionen konnten nicht geladen werden.");
+        setLoadError(err instanceof ApiError ? err.message : t("errors.transactionsFetchFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -74,7 +85,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
     return () => {
       cancelled = true;
     };
-  }, [jobId, category, minConfidence, search, sort, order, page]);
+  }, [jobId, category, minConfidence, search, sort, order, page, t]);
 
   function toggleSort(key: string) {
     if (sort === key) {
@@ -92,18 +103,18 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
       <div className="results__toolbar">
         <div className="results__filters">
           <label>
-            Kategorie
+            {t("results.categoryLabel")}
             <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">Alle</option>
+              <option value="">{t("results.allCategories")}</option>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(`category.${c}`)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Min. Confidence
+            {t("results.minConfidence")}
             <input
               type="number"
               min={0}
@@ -115,7 +126,7 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
             />
           </label>
           <label>
-            Suche (Hash/Adresse)
+            {t("results.search")}
             <input
               type="text"
               value={search}
@@ -128,10 +139,10 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
 
         <div className="results__downloads">
           <a href={exportUrl(jobId, "csv")} download className="results__download-link">
-            CSV herunterladen
+            {t("results.downloadCsv")}
           </a>
           <a href={exportUrl(jobId, "json")} download className="results__download-link">
-            JSON herunterladen
+            {t("results.downloadJson")}
           </a>
         </div>
       </div>
@@ -146,33 +157,33 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
         <table className="results__table">
           <thead>
             <tr>
-              {SORTABLE_COLUMNS.map((col) => (
-                <th key={col.key}>
-                  <button type="button" className="results__sort-button" onClick={() => toggleSort(col.key)}>
-                    {col.label}
-                    {sort === col.key ? (order === "asc" ? " ▲" : " ▼") : ""}
+              {SORTABLE_COLUMNS.map((key) => (
+                <th key={key}>
+                  <button type="button" className="results__sort-button" onClick={() => toggleSort(key)}>
+                    {t(COLUMN_LABEL_KEYS[key])}
+                    {sort === key ? (order === "asc" ? " ▲" : " ▼") : ""}
                   </button>
                 </th>
               ))}
-              <th>Richtung</th>
-              <th>Token</th>
-              <th>TX-Hash</th>
-              <th>Warnhinweise</th>
+              <th>{t("results.columnDirection")}</th>
+              <th>{t("results.columnToken")}</th>
+              <th>{t("results.columnTxHash")}</th>
+              <th>{t("results.columnWarnings")}</th>
             </tr>
           </thead>
           <tbody>
             {data?.items.map((tx, index) => (
               <tr key={`${tx.tx_hash}-${tx.record_type}-${tx.token_symbol}-${tx.direction}-${index}`}>
-                <td>{new Date(tx.timestamp).toLocaleString("de-DE")}</td>
+                <td>{new Date(tx.timestamp).toLocaleString(dateLocaleTag)}</td>
                 <td>
                   <span className={`category-pill category-pill--slot-${CATEGORY_SLOT[tx.category] ?? 7}`}>
-                    {tx.category}
+                    {t(`category.${tx.category}`)}
                   </span>
                 </td>
                 <td className="results__numeric">{tx.amount}</td>
                 <td className="results__numeric">{tx.confidence.toFixed(2)}</td>
                 <td className="results__numeric">{tx.block_number}</td>
-                <td>{tx.direction === "in" ? "Eingang" : "Ausgang"}</td>
+                <td>{tx.direction === "in" ? t("results.directionIn") : t("results.directionOut")}</td>
                 <td>{tx.token_symbol}</td>
                 <td>
                   <span className="results__hash" title={tx.tx_hash}>
@@ -192,24 +203,22 @@ export function ResultsTable({ jobId }: ResultsTableProps) {
             ))}
           </tbody>
         </table>
-        {loading && <p className="results__loading">Lädt…</p>}
-        {data && data.items.length === 0 && !loading && <p className="results__empty">Keine Treffer für diese Filter.</p>}
+        {loading && <p className="results__loading">{t("results.loading")}</p>}
+        {data && data.items.length === 0 && !loading && <p className="results__empty">{t("results.empty")}</p>}
       </div>
 
       {data && (
         <div className="results__pagination">
           <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-            ← Zurück
+            {t("results.prevPage")}
           </button>
-          <span>
-            Seite {page} von {totalPages} ({data.total} Treffer)
-          </span>
+          <span>{t("results.pageIndicator", { page, totalPages, total: data.total })}</span>
           <button
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
           >
-            Weiter →
+            {t("results.nextPage")}
           </button>
         </div>
       )}

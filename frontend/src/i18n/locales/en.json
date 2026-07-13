@@ -1,0 +1,87 @@
+{
+  "app": {
+    "title": "ChainLedger Platform"
+  },
+  "addressForm": {
+    "label": "Ethereum wallet address",
+    "placeholder": "0x...",
+    "validationError": "Please enter a valid Ethereum address (0x + 40 hex characters).",
+    "submit": "Start import",
+    "submitting": "Running…"
+  },
+  "errors": {
+    "importStartFailed": "Could not start the import.",
+    "statusFetchFailed": "Could not fetch job status.",
+    "transactionsFetchFailed": "Could not load transactions."
+  },
+  "jobProgress": {
+    "statusLabel": "Status: {{state}}",
+    "stageLabel": "Stage: {{stage}}",
+    "errorLabel": "Error: {{error}}",
+    "transactionsCount_one": "{{count}} transaction",
+    "transactionsCount_other": "{{count}} transactions",
+    "pagesCount_one": "{{count}} page",
+    "pagesCount_other": "{{count}} pages",
+    "summaryProcessed_one": "Done: {{count}} transaction processed",
+    "summaryProcessed_other": "Done: {{count}} transactions processed",
+    "summaryUnclassified_one": "– {{count}} of which unclassified (manual review recommended).",
+    "summaryUnclassified_other": "– {{count}} of which unclassified (manual review recommended)."
+  },
+  "state": {
+    "queued": "Queued",
+    "running": "Running",
+    "done": "Done",
+    "error": "Error"
+  },
+  "stage": {
+    "fetching": "Fetching data",
+    "classifying": "Classifying",
+    "validating": "Validating",
+    "exporting": "Exporting"
+  },
+  "recordType": {
+    "normal": "Normal transactions",
+    "internal": "Internal transfers",
+    "erc20": "ERC-20 token transfers"
+  },
+  "category": {
+    "Transfer-In": "Transfer-In",
+    "Transfer-Out": "Transfer-Out",
+    "Swap": "Swap",
+    "Staking-Reward": "Staking Reward",
+    "Airdrop": "Airdrop",
+    "Contract-Interaktion": "Contract Interaction",
+    "Unklassifiziert": "Unclassified"
+  },
+  "results": {
+    "categoryLabel": "Category",
+    "allCategories": "All",
+    "minConfidence": "Min. confidence",
+    "search": "Search (hash/address)",
+    "downloadCsv": "Download CSV",
+    "downloadJson": "Download JSON",
+    "columnTimestamp": "Timestamp",
+    "columnCategory": "Category",
+    "columnAmount": "Amount",
+    "columnConfidence": "Confidence",
+    "columnBlock": "Block",
+    "columnDirection": "Direction",
+    "columnToken": "Token",
+    "columnTxHash": "TX hash",
+    "columnWarnings": "Warnings",
+    "directionIn": "Incoming",
+    "directionOut": "Outgoing",
+    "loading": "Loading…",
+    "empty": "No matches for these filters.",
+    "prevPage": "← Previous",
+    "nextPage": "Next →",
+    "pageIndicator": "Page {{page}} of {{totalPages}} ({{total}} results)"
+  },
+  "theme": {
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode"
+  },
+  "language": {
+    "label": "Change language"
+  }
+}

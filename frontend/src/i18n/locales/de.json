@@ -1,0 +1,87 @@
+{
+  "app": {
+    "title": "ChainLedger Platform"
+  },
+  "addressForm": {
+    "label": "Ethereum-Wallet-Adresse",
+    "placeholder": "0x...",
+    "validationError": "Bitte eine gültige Ethereum-Adresse eingeben (0x + 40 Hex-Zeichen).",
+    "submit": "Import starten",
+    "submitting": "Läuft…"
+  },
+  "errors": {
+    "importStartFailed": "Import konnte nicht gestartet werden.",
+    "statusFetchFailed": "Status konnte nicht abgerufen werden.",
+    "transactionsFetchFailed": "Transaktionen konnten nicht geladen werden."
+  },
+  "jobProgress": {
+    "statusLabel": "Status: {{state}}",
+    "stageLabel": "Phase: {{stage}}",
+    "errorLabel": "Fehler: {{error}}",
+    "transactionsCount_one": "{{count}} Transaktion",
+    "transactionsCount_other": "{{count}} Transaktionen",
+    "pagesCount_one": "{{count}} Seite",
+    "pagesCount_other": "{{count}} Seiten",
+    "summaryProcessed_one": "Fertig: {{count}} Transaktion verarbeitet",
+    "summaryProcessed_other": "Fertig: {{count}} Transaktionen verarbeitet",
+    "summaryUnclassified_one": "– {{count}} davon unklassifiziert (manuelle Prüfung empfohlen).",
+    "summaryUnclassified_other": "– {{count}} davon unklassifiziert (manuelle Prüfung empfohlen)."
+  },
+  "state": {
+    "queued": "In Warteschlange",
+    "running": "Läuft",
+    "done": "Abgeschlossen",
+    "error": "Fehler"
+  },
+  "stage": {
+    "fetching": "Daten werden abgerufen",
+    "classifying": "Klassifizierung läuft",
+    "validating": "Validierung läuft",
+    "exporting": "Export wird erstellt"
+  },
+  "recordType": {
+    "normal": "Normale Transaktionen",
+    "internal": "Interne Transfers",
+    "erc20": "ERC-20 Token-Transfers"
+  },
+  "category": {
+    "Transfer-In": "Transfer-In",
+    "Transfer-Out": "Transfer-Out",
+    "Swap": "Swap",
+    "Staking-Reward": "Staking-Reward",
+    "Airdrop": "Airdrop",
+    "Contract-Interaktion": "Contract-Interaktion",
+    "Unklassifiziert": "Unklassifiziert"
+  },
+  "results": {
+    "categoryLabel": "Kategorie",
+    "allCategories": "Alle",
+    "minConfidence": "Min. Confidence",
+    "search": "Suche (Hash/Adresse)",
+    "downloadCsv": "CSV herunterladen",
+    "downloadJson": "JSON herunterladen",
+    "columnTimestamp": "Zeitstempel",
+    "columnCategory": "Kategorie",
+    "columnAmount": "Betrag",
+    "columnConfidence": "Confidence",
+    "columnBlock": "Block",
+    "columnDirection": "Richtung",
+    "columnToken": "Token",
+    "columnTxHash": "TX-Hash",
+    "columnWarnings": "Warnhinweise",
+    "directionIn": "Eingang",
+    "directionOut": "Ausgang",
+    "loading": "Lädt…",
+    "empty": "Keine Treffer für diese Filter.",
+    "prevPage": "← Zurück",
+    "nextPage": "Weiter →",
+    "pageIndicator": "Seite {{page}} von {{totalPages}} ({{total}} Treffer)"
+  },
+  "theme": {
+    "switchToDark": "Dark Mode aktivieren",
+    "switchToLight": "Light Mode aktivieren"
+  },
+  "language": {
+    "label": "Sprache wechseln"
+  }
+}

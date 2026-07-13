@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 // Gleiches Muster wie ADDRESS_PATTERN im Backend (src/cli.py) - clientseitig
 // nur fuer schnelles Feedback, das Backend validiert ohnehin nochmal.
@@ -10,28 +11,29 @@ interface AddressFormProps {
 }
 
 export function AddressForm({ onSubmit, disabled }: AddressFormProps) {
+  const { t } = useTranslation();
   const [address, setAddress] = useState("");
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [hasValidationError, setHasValidationError] = useState(false);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = address.trim();
     if (!ADDRESS_PATTERN.test(trimmed)) {
-      setValidationError("Bitte eine gültige Ethereum-Adresse eingeben (0x + 40 Hex-Zeichen).");
+      setHasValidationError(true);
       return;
     }
-    setValidationError(null);
+    setHasValidationError(false);
     onSubmit(trimmed);
   }
 
   return (
     <form onSubmit={handleSubmit} className="address-form">
-      <label htmlFor="wallet-address">Ethereum-Wallet-Adresse</label>
+      <label htmlFor="wallet-address">{t("addressForm.label")}</label>
       <div className="address-form__row">
         <input
           id="wallet-address"
           type="text"
-          placeholder="0x..."
+          placeholder={t("addressForm.placeholder")}
           value={address}
           onChange={(event) => setAddress(event.target.value)}
           disabled={disabled}
@@ -39,12 +41,12 @@ export function AddressForm({ onSubmit, disabled }: AddressFormProps) {
           autoComplete="off"
         />
         <button type="submit" disabled={disabled || address.trim().length === 0}>
-          {disabled ? "Läuft…" : "Import starten"}
+          {disabled ? t("addressForm.submitting") : t("addressForm.submit")}
         </button>
       </div>
-      {validationError && (
+      {hasValidationError && (
         <p className="form-error" role="alert">
-          {validationError}
+          {t("addressForm.validationError")}
         </p>
       )}
     </form>

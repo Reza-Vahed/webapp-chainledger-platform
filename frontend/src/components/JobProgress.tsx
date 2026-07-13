@@ -1,37 +1,20 @@
+import { useTranslation } from "react-i18next";
 import type { JobStatusResponse } from "../types";
-
-const STAGE_LABELS: Record<string, string> = {
-  fetching: "Daten werden abgerufen",
-  classifying: "Klassifizierung läuft",
-  validating: "Validierung läuft",
-  exporting: "Export wird erstellt",
-};
-
-const STATE_LABELS: Record<string, string> = {
-  queued: "In Warteschlange",
-  running: "Läuft",
-  done: "Abgeschlossen",
-  error: "Fehler",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  normal: "Normale Transaktionen",
-  internal: "Interne Transfers",
-  erc20: "ERC-20 Token-Transfers",
-};
 
 interface JobProgressProps {
   status: JobStatusResponse;
 }
 
 export function JobProgress({ status }: JobProgressProps) {
+  const { t } = useTranslation();
+
   return (
     <section className="job-progress" aria-live="polite">
-      <h2>Status: {STATE_LABELS[status.state] ?? status.state}</h2>
-      {status.stage && <p className="job-progress__stage">Phase: {STAGE_LABELS[status.stage] ?? status.stage}</p>}
+      <h2>{t("jobProgress.statusLabel", { state: t(`state.${status.state}`) })}</h2>
+      {status.stage && <p className="job-progress__stage">{t("jobProgress.stageLabel", { stage: t(`stage.${status.stage}`) })}</p>}
       {status.error && (
         <p className="form-error" role="alert">
-          Fehler: {status.error}
+          {t("jobProgress.errorLabel", { error: status.error })}
         </p>
       )}
 
@@ -42,14 +25,14 @@ export function JobProgress({ status }: JobProgressProps) {
             {Object.values(addressProgress.categories).map((category) => (
               <li key={category.category}>
                 <span className={`category-badge category-badge--${category.status}`}>
-                  {CATEGORY_LABELS[category.category] ?? category.category}
+                  {t(`recordType.${category.category}`)}
                 </span>{" "}
                 {category.status === "error" ? (
-                  <span className="form-error">Fehler: {category.error}</span>
+                  <span className="form-error">{t("jobProgress.errorLabel", { error: category.error })}</span>
                 ) : (
                   <span>
-                    {category.records_fetched} Transaktionen ({category.pages_fetched}{" "}
-                    {category.pages_fetched === 1 ? "Seite" : "Seiten"})
+                    {t("jobProgress.transactionsCount", { count: category.records_fetched })} (
+                    {t("jobProgress.pagesCount", { count: category.pages_fetched })})
                   </span>
                 )}
               </li>
@@ -60,11 +43,10 @@ export function JobProgress({ status }: JobProgressProps) {
 
       {status.state === "done" && status.total_transactions !== null && (
         <p className="job-progress__summary">
-          Fertig: {status.total_transactions} Transaktionen verarbeitet
+          {t("jobProgress.summaryProcessed", { count: status.total_transactions })}
           {status.unclassified_count !== null && status.unclassified_count > 0 && (
-            <> – {status.unclassified_count} davon unklassifiziert (manuelle Prüfung empfohlen)</>
+            <> {t("jobProgress.summaryUnclassified", { count: status.unclassified_count })}</>
           )}
-          .
         </p>
       )}
     </section>

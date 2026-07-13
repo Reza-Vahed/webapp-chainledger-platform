@@ -83,7 +83,7 @@ cp .env.example .env
 pytest tests/ -v
 ```
 
-40 automated tests cover the API client (pagination, rate-limit retry,
+41 automated tests cover the API client (pagination, rate-limit retry,
 error handling), normalizer, classifier, validator, exporter, and the
 raw-data persistence hook.
 

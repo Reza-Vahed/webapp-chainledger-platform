@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Laufzeitdaten (Audit-Artefakte enthalten ggf. wallet-bezogene Daten -> nicht versionieren)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Editor
+.vscode/
+.DS_Store

@@ -149,6 +149,35 @@ Wallet-Adresse mit weniger Transaktionen - die Anzahl lässt sich vorab
 auf der Etherscan-Adressseite prüfen
 (`https://etherscan.io/address/<adresse>`, Reiter "Transactions").
 
+### Zweites Beispiel: eine kleine Wallet (schneller Vergleichslauf)
+
+`0x7e2d0fe0ffdd78c264f8d40d19acb7d04390c6e8` - eine Gegenpartei-Adresse
+aus vitalik.eths frühester (2015er) On-Chain-Historie, also eine echte,
+öffentlich nachprüfbare Adresse, nur deutlich weniger aktiv.
+
+**Verifiziert mit einem echten Lauf (13.07.2026): 26 Transaktionen**,
+Laufzeit ca. 1 Sekunde (jede Kategorie passte auf eine einzige Seite,
+weder Pagination noch Rate-Limiting nötig) - `9` Contract-Interaktion,
+`8` Transfer-Out, `8` Unklassifiziert, `1` Transfer-In.
+
+Auffällig ist der deutlich höhere Anteil an `Unklassifiziert` (~31 %) im
+Vergleich zu vitalik.eth (~0,17 %). Das ist bewusstes, konservatives
+Verhalten und kein Bug: Die meisten markierten Zeilen sind eingehende
+ETH-Transfers, die zusätzlich Input-Daten auf einer "normalen"
+Transaktion tragen - ein Muster, das in der frühen (2015er)
+Ethereum-Nutzung häufiger vorkam. Da nicht sicher feststellbar ist, ob
+ein solcher Datensatz "nur" ein Transfer ist oder etwas anderes, verweigert
+der Classifier das Raten und markiert ihn stattdessen mit
+`manual_review_required`. Die deutlich niedrigere Quote bei vitalik.eth
+spiegelt lediglich wider, dass dort die meisten Transaktionen entweder
+reine ETH-Transfers (leere Input-Daten) oder klar erkennbare Swap-Muster
+sind.
+
+Gutes Beispiel dafür, warum eine einzelne "moderate" Test-Adresse allein
+nicht ausreicht, um die Klassifikationsqualität zu beurteilen -
+Aktivitätsmuster unterscheiden sich stark je nach Alter und Nutzungsstil
+der Wallet.
+
 ## Daten & Datenschutz (DSGVO)
 
 Alles läuft und verbleibt lokal. `data/raw/` und `data/processed/` sind

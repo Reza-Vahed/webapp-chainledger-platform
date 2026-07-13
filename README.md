@@ -135,6 +135,31 @@ choosing with a lower transaction count - check the count on the address's
 Etherscan page before running (`https://etherscan.io/address/<address>`,
 "Transactions" tab).
 
+### Second example: a small wallet (fast comparison run)
+
+`0x7e2d0fe0ffdd78c264f8d40d19acb7d04390c6e8` - a counterparty address that
+shows up in vitalik.eth's earliest (2015) on-chain history, i.e. a
+real, publicly verifiable address, just far less active.
+
+**Verified with a real run (2026-07-13): 26 transactions**, finished in
+about 1 second (each category fit on a single page, no pagination or
+rate-limiting involved) - `9` Contract-Interaktion, `8` Transfer-Out, `8`
+Unklassifiziert, `1` Transfer-In.
+
+Notably, the `Unklassifiziert` share here is much higher (~31%) than for
+vitalik.eth (~0.17%). This is intentional, conservative behavior, not a
+bug: most of the flagged rows are incoming ETH transfers that also carry
+non-empty input data on a "normal" transaction - a pattern more common in
+early (2015-era) Ethereum usage. Since we can't be sure such a record is
+"just" a transfer versus something else, the classifier refuses to guess
+and flags it `manual_review_required` instead. vitalik.eth's much lower
+rate simply reflects that most of its transactions are either plain ETH
+transfers (empty input data) or clearly recognizable swap patterns.
+
+Good illustration of why a single "moderate" test address isn't enough on
+its own to judge classification quality - activity patterns vary a lot
+by wallet age and usage style.
+
 ## Data & privacy (GDPR)
 
 Everything runs and stays local. `data/raw/` and `data/processed/` are

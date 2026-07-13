@@ -1,5 +1,7 @@
 # ChainLedger Platform - On-Chain Data Import Agent (MVP)
 
+[![GitHub release](https://img.shields.io/github/v/release/Reza-Vahed/webapp-chainledger-platform)](https://github.com/Reza-Vahed/webapp-chainledger-platform/releases/tag/v1.0.0)
+
 🇩🇪 [Deutsche Version](README.de.md)
 
 A read-only CLI tool that pulls on-chain transaction data directly from

@@ -82,7 +82,7 @@ def _write_csv(transactions: list[CanonicalTransaction], path: Path) -> None:
 
 
 def _write_json(transactions: list[CanonicalTransaction], path: Path) -> None:
-    payload = [_to_json_dict(tx) for tx in transactions]
+    payload = [transaction_to_dict(tx) for tx in transactions]
     with path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
@@ -109,7 +109,11 @@ def _to_csv_row(tx: CanonicalTransaction) -> dict[str, Any]:
     }
 
 
-def _to_json_dict(tx: CanonicalTransaction) -> dict[str, Any]:
+def transaction_to_dict(tx: CanonicalTransaction) -> dict[str, Any]:
+    """Öffentliche JSON-Serialisierung einer kanonischen Transaktion -
+    von _write_json UND vom Web-Backend (api/routers/imports.py) genutzt,
+    damit die Formatierung (insb. Decimal-Festkommadarstellung) nicht an
+    zwei Stellen gepflegt werden muss."""
     return {
         "wallet_address": tx.wallet_address,
         "tx_hash": tx.tx_hash,

@@ -62,39 +62,71 @@ def make_raw_sink(raw_dir: Path, run_id: str) -> Callable[[str, str, int, dict[s
     return sink
 
 
+ProgressCallback = Callable[[dict[str, Any]], None]
+
+
 def run_import(
     addresses: list[str],
     client: EtherscanClient,
     raw_dir: Path,
     processed_dir: Path,
     run_id: str,
+    progress_callback: ProgressCallback | None = None,
 ) -> tuple[Path, Path, list[CanonicalTransaction]]:
     """Führt die volle Pipeline für eine oder mehrere Wallets aus und
-    liefert die Pfade zu CSV/JSON sowie die validierten Transaktionen."""
+    liefert die Pfade zu CSV/JSON sowie die validierten Transaktionen.
+
+    progress_callback ist optional und rein additiv (Default None, CLI-
+    Verhalten unveraendert) - wird u. a. vom Web-Backend (api/jobs.py)
+    genutzt, um Live-Fortschritt fuer Polling bereitzustellen, ohne die
+    Pipeline-Module selbst anzufassen.
+    """
+
+    def report(event: str, **kwargs: Any) -> None:
+        if progress_callback is not None:
+            progress_callback({"event": event, **kwargs})
+
     raw_sink = make_raw_sink(raw_dir, run_id)
     all_normalized: list[CanonicalTransaction] = []
 
     for address in addresses:
         if not ADDRESS_PATTERN.match(address):
             logger.error("Ungültiges Adressformat, überspringe: %s", address)
+            report("address_invalid", address=address)
             continue
 
         logger.info("Starte Import für Wallet %s", address)
+        report("address_start", address=address)
         for category in CATEGORIES:
+            report("category_start", address=address, category=category.value)
+
+            def sink_with_progress(
+                cat: str, addr: str, page: int, data: dict[str, Any], _raw_sink: Callable = raw_sink
+            ) -> None:
+                _raw_sink(cat, addr, page, data)
+                result = data.get("result")
+                page_count = len(result) if isinstance(result, list) else 0
+                report("category_page", address=addr, category=cat, page=page, page_count=page_count)
+
             try:
-                raw_txs = client.fetch_transactions(address, category.value, raw_response_sink=raw_sink)
+                raw_txs = client.fetch_transactions(address, category.value, raw_response_sink=sink_with_progress)
             except EtherscanAPIError as exc:
                 logger.error(
                     "Abruf fehlgeschlagen (address=%s category=%s): %s", address, category.value, exc
                 )
+                report("category_error", address=address, category=category.value, error=str(exc))
                 continue
             normalized = normalize_transactions(raw_txs, category, address)
             logger.info(
                 "Normalisiert: address=%s category=%s anzahl=%s", address, category.value, len(normalized)
             )
+            report("category_done", address=address, category=category.value, count=len(normalized))
             all_normalized.extend(normalized)
 
+    report("stage", stage="classifying")
     classified = classify_transactions(all_normalized)
+
+    report("stage", stage="validating")
     validated = validate_transactions(classified)
 
     unclassified = [tx for tx in validated if tx.category == TxCategory.UNCLASSIFIED]
@@ -104,7 +136,10 @@ def run_import(
             len(unclassified), len(validated),
         )
 
+    report("stage", stage="exporting")
     csv_path, json_path = export_transactions(validated, processed_dir, run_id)
+
+    report("done", total=len(validated), csv_path=str(csv_path), json_path=str(json_path))
     return csv_path, json_path, validated
 
 

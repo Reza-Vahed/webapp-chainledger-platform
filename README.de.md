@@ -4,19 +4,19 @@
 
 🇬🇧 [English version](README.md)
 
-Ein strikt read-only CLI-Tool, das On-Chain-Transaktionsdaten direkt von
-öffentlichen Ethereum-Wallet-Adressen abruft, in ein kanonisches Modell
-normalisiert, nach einer festen steuerlich relevanten Kategorienliste
-klassifiziert, offensichtliche Datenprobleme markiert und als CSV + JSON
-für den manuellen Abgleich mit Krypto-Steuer-Tools (z. B. Blockpit,
-CoinTracking) exportiert.
+Ein strikt read-only CLI- + Web-Tool, das On-Chain-Transaktionsdaten
+direkt von öffentlichen EVM-Wallet-Adressen (Ethereum Mainnet, Arbitrum
+One) abruft, in ein kanonisches Modell normalisiert, nach einer festen
+steuerlich relevanten Kategorienliste klassifiziert, offensichtliche
+Datenprobleme markiert und als CSV + JSON für den manuellen Abgleich mit
+Krypto-Steuer-Tools (z. B. Blockpit, CoinTracking) exportiert.
 
 Dies ist ein Portfolio-/technisches Validierungsprojekt, **keine**
 Steuersoftware.
 
 ## Was dieses Tool NICHT tut
 
-- Keine UI, keine Datenbank, keine Multi-Chain-Unterstützung, keine
+- Keine Nutzerkonten/Auth, kein externer DB-Server, keine
   KI-Komponenten (MVP-Scope)
 - Keine Steuerberechnung, keine FIFO-/Anschaffungskosten-Logik - es
   bereitet Daten nur auf
@@ -51,6 +51,24 @@ Orchestriert durch `src/cli.py`. Die Datenquelle ist hinter
 Etherscan später gegen einen anderen Anbieter ausgetauscht werden kann,
 ohne den Rest der Pipeline anzufassen. Die Begründung dieser Entscheidungen
 steht in `docs/adr/`.
+
+### Multi-Chain-Support
+
+Aktuell werden zwei Chains unterstützt: **Ethereum Mainnet** (Default)
+und **Arbitrum One**, wählbar über `--chain` (CLI) bzw. das
+Chain-Dropdown (Web-UI). Beide werden über **denselben**
+`EtherscanClient` bedient, parametrisiert über eine kleine
+Chain-Registry (`src/api_client/chains.py`) - Etherscan API V2 deckt
+beide Chains (und 50+ weitere EVM-Chains) über denselben Endpunkt und
+API-Key ab, es war also keine zweite Client-Implementierung und kein
+zusätzlicher API-Key nötig. Die Klassifikationslogik bleibt unverändert
+chain-übergreifend identisch; nur das native Gas-Token-Symbol/-Decimals
+und die Allowlists bekannter Contracts (`src/classifier.py`) sind
+chain-geschlüsselt, damit eine Mainnet-Contract-Adresse nie fälschlich
+für einen unabhängigen Contract auf einer anderen Chain gehalten wird.
+Der vollständige Vergleich (Arbitrum vs. Polygon) sowie die
+Live-Rate-Limit-Verifikation stehen in
+`docs/adr/0004-multi-chain-support.md`.
 
 ## Klassifikations-Kategorien
 
@@ -94,14 +112,21 @@ cp .env.example .env
 pytest tests/ -v
 ```
 
-41 automatisierte Tests decken den API-Client (Pagination, Rate-Limit-
-Retry, Fehlerbehandlung), Normalizer, Classifier, Validator, Exporter und
-den Rohdaten-Persistenz-Hook ab.
+81 automatisierte Tests decken den API-Client (Pagination, Rate-Limit-
+Retry, Fehlerbehandlung), Normalizer, Classifier, Validator, Exporter,
+den Rohdaten-Persistenz-Hook, die Chain-Registry sowie den
+SQLite-basierten Job-Store (`api/db.py`) ab.
 
 ## Beispielaufruf
 
 ```bash
 python -m src.cli 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+```
+
+Dieselbe Wallet auf Arbitrum One statt Ethereum Mainnet:
+
+```bash
+python -m src.cli 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --chain arbitrum
 ```
 
 Mehrere Wallets in einem Lauf:
@@ -110,9 +135,10 @@ Mehrere Wallets in einem Lauf:
 python -m src.cli 0xAdresse1... 0xAdresse2...
 ```
 
-Optionale Flags: `--env-file`, `--raw-dir`, `--processed-dir`, `--log-dir`
-(Defaults: `data/raw/`, `data/processed/`, `data/logs/` im Projekt-Root -
-siehe `python -m src.cli --help`).
+Optionale Flags: `--chain` (Default `ethereum`, alternativ `arbitrum`),
+`--env-file`, `--raw-dir`, `--processed-dir`, `--log-dir` (Defaults:
+`data/raw/`, `data/processed/`, `data/logs/` im Projekt-Root - siehe
+`python -m src.cli --help`).
 
 Ausgabe:
 - `data/raw/<run_id>_<adresse>_<kategorie>_page<N>.json` - unveränderte
@@ -180,7 +206,32 @@ nicht ausreicht, um die Klassifikationsqualität zu beurteilen -
 Aktivitätsmuster unterscheiden sich stark je nach Alter und Nutzungsstil
 der Wallet.
 
-## Web-Frontend (Phase 2)
+### Akzeptanztest Arbitrum One (dieselben Adressen, andere Chain)
+
+EOA-Adressen sind chain-übergreifend identisch, daher wurden beide obigen
+Adressen mit einem echten Lauf gegen **Arbitrum One** (`--chain arbitrum`)
+erneut verifiziert, statt neue Referenzadressen zu suchen.
+
+**`vitalik.eth`, verifiziert mit einem echten Lauf (15.07.2026): 20.070
+Transaktionen**, durchgängig verarbeitet in ca. 11 Sekunden (20.038
+Transfer-In, 10 Swap, 3 Contract-Interaktion, 2 Transfer-Out, 17
+Unklassifiziert). Deutlich geringeres Volumen als auf Mainnet (dort
+446.829) - konsistent damit, dass diese Adresse deutlich stärker
+Mainnet-nativ ist - aber immer noch genug, um Pagination real zu testen:
+Sowohl `normal` als auch `tokentx` erreichten Etherscans
+10.000-Datensätze-Pagination-Fenster und lösten eine
+`startblock`-Verschiebung aus (`src/api_client/etherscan_client.py`) -
+bestätigt, dass dieser Mechanismus unverändert auch auf einer zweiten
+Chain funktioniert. In diesem sequenziellen CLI-Lauf waren keine
+Rate-Limit-Retries nötig.
+
+**Kleine Wallet `0x7e2d0fe0ffdd78c264f8d40d19acb7d04390c6e8`, verifiziert
+mit einem echten Lauf (15.07.2026): 7 Transaktionen** (6
+Contract-Interaktion, 1 Unklassifiziert) - Laufzeit ca. 1 Sekunde, jede
+Kategorie passte auf eine einzige Seite, weder Pagination noch
+Rate-Limiting nötig.
+
+## Web-Frontend (Phase 2 + 3)
 
 Eine React+TypeScript-SPA (`frontend/`) sitzt auf einem schlanken
 FastAPI-Wrapper (`api/`) um dieselbe oben beschriebene Pipeline auf - keine
@@ -196,10 +247,16 @@ doppelte Logik, CLI und Web-App teilen sich unverändert `src/`.
   umschalten, was beim Abgleich mit den CSV/JSON-Exporten (immer
   gregorianisch) verwirrend wäre.
 - Light/Dark-Theme-Umschalter (persistiert in `localStorage`).
-- Wallet-Adresse eingeben, Live-Fortschritt pro Kategorie beobachten
-  (Polling alle 1,5 s - bewusst statt SSE/WebSocket als einfachste
-  robuste MVP-Lösung gewählt), danach Ergebnisse in einer paginierten,
+- Wallet-Adresse eingeben, Chain (Ethereum Mainnet oder Arbitrum One) im
+  Dropdown wählen, Live-Fortschritt pro Kategorie beobachten (Polling
+  alle 1,5 s - bewusst statt SSE/WebSocket als einfachste robuste
+  MVP-Lösung gewählt), danach Ergebnisse in einer paginierten,
   filterbaren, sortierbaren Tabelle mit CSV-/JSON-Download durchsuchen.
+- **Import-Historie**: Liste vergangener Importe (jede Chain, jeder
+  Status) mit der Möglichkeit, ein abgeschlossenes Ergebnis erneut zu
+  öffnen oder zu löschen (entfernt DB-Zeile sowie zugehörige
+  Roh-/Export-Dateien; blockiert bei laufenden Jobs). Übersteht
+  Backend-Neustarts - siehe "Persistenz" unten.
 - Der Etherscan-API-Key erreicht nie den Browser - nur das FastAPI-Backend
   spricht mit Etherscan, über dieselbe `.env` wie die CLI.
 
@@ -230,21 +287,46 @@ später eine kleine Ergänzung statt eines Umbaus ist).
 
 | Methode & Pfad | Zweck |
 |---|---|
-| `POST /api/v1/imports` | Startet Job für 1+ Adressen |
+| `POST /api/v1/imports` | Startet Job für 1+ Adressen (`chain`: Default `ethereum` oder `arbitrum`) |
+| `GET /api/v1/imports` | Import-Historie (alle Chains, alle Status), neueste zuerst |
 | `GET /api/v1/imports/{id}` | Job-Status + Fortschritt pro Kategorie (fürs Polling) |
 | `GET /api/v1/imports/{id}/transactions` | Paginierte/gefilterte/sortierte Ergebnisse |
 | `GET /api/v1/imports/{id}/export/{csv,json}` | Download des erzeugten Exports |
+| `DELETE /api/v1/imports/{id}` | Löscht einen abgeschlossenen/fehlgeschlagenen Import (`409` bei laufendem Job) |
 
-Bekannte MVP-Grenze (dokumentiert, nicht gelöst): Job-Status lebt nur im
-Speicher des Backend-Prozesses - keine Persistenz über Neustarts hinweg,
-kein Multi-Worker-Support. Für ein Einzelnutzer-Demo-Tool ohne
-Nutzerkonten ausreichend; eine Datenbank wäre an dieser Stelle
-Over-Engineering.
+### Persistenz
+
+Job-Metadaten (Chain, Adressen, Status, Zeitstempel, Zähler) werden bei
+jedem Statusübergang in eine lokale SQLite-Datenbank
+(`data/chainledger.db`, in `.gitignore`) geschrieben. Die validierten
+Transaktionen selbst werden **nicht** zusätzlich in der Datenbank
+gespeichert - sie liegen bereits in
+`data/processed/transactions_<job_id>.json` (siehe "Ausgabe" oben) und
+werden beim Wiederöffnen eines abgeschlossenen Imports nach einem
+Neustart von dort zurückgelesen. Verifiziert gegen einen echten,
+per `kill` beendeten und neu gestarteten Backend-Prozess, nicht nur
+simuliert - der vollständige Vergleich mit einer datei-basierten
+Alternative sowie die Begründung stehen in
+`docs/adr/0005-persistence.md`.
+
+Die Aufbewahrung ist bewusst nur manuell steuerbar: abgeschlossene
+Importe bleiben bestehen, bis sie explizit über API/UI gelöscht werden -
+kein automatischer Ablauf, kein Hintergrund-Scheduler (wäre für ein
+Einzelnutzer-Tool Over-Engineering). Das Löschen eines laufenden Jobs
+wird abgelehnt (`409`), um Races mit dessen schreibendem Thread zu
+vermeiden.
+
+Bekannte verbleibende MVP-Grenze (dokumentiert, nicht gelöst): Ein
+einzelner Prozess hält die aktuell laufenden Jobs im Speicher (kein
+Multi-Worker-Support), und ein Job, der beim Absturz des Backends gerade
+"running" war, bleibt in der Historie danach dauerhaft auf "running"
+stehen (keine Recovery-Heuristik). Für ein Einzelnutzer-Demo-Tool ohne
+Nutzerkonten ausreichend.
 
 ### Backend-Tests
 
 ```bash
-pytest tests/test_api_imports.py tests/test_cli.py -v
+pytest tests/test_api_imports.py tests/test_cli.py tests/test_job_store.py tests/test_chains.py -v
 ```
 
 Nutzt FastAPIs `TestClient` mit einem Fake-Etherscan-Client - keine
@@ -252,13 +334,19 @@ echten Netzwerkaufrufe, kein API-Key zum Ausführen nötig.
 
 ## Daten & Datenschutz (DSGVO)
 
-Alles läuft und verbleibt lokal. `data/raw/` und `data/processed/` sind
-standardmäßig in `.gitignore`, da sie wallet-bezogene Transaktionsdaten
-enthalten können. Es werden keine Zugangsdaten außer dem eigenen
-Etherscan-API-Key gespeichert (über `.env`, niemals committet) - das gilt
-identisch für CLI und Web-Backend, die dieselbe `.env`-Datei lesen.
+Alles läuft und verbleibt lokal. `data/raw/`, `data/processed/` und die
+Job-Historie-Datenbank (`data/chainledger.db`) sind standardmäßig in
+`.gitignore`, da sie wallet-bezogene Transaktionsdaten enthalten können.
+Es werden keine Zugangsdaten außer dem eigenen Etherscan-API-Key
+gespeichert (über `.env`, niemals committet) - das gilt identisch für
+CLI und Web-Backend, die dieselbe `.env`-Datei lesen. Derselbe Key deckt
+jede unterstützte Chain ab (siehe "Multi-Chain-Support" oben), Arbitrum
+führt also kein neues Secret ein. Die Import-Historie bleibt bestehen,
+bis sie manuell gelöscht wird (siehe "Persistenz" oben) - bewusst keine
+automatische unbegrenzte Aufbewahrung.
 
 ## Dokumentation
 
 - Architecture Decision Records: `docs/adr/0001-tech-stack.md`,
-  `0002-api-choice.md`, `0003-output-format.md`
+  `0002-api-choice.md`, `0003-output-format.md`,
+  `0004-multi-chain-support.md`, `0005-persistence.md`

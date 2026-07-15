@@ -10,9 +10,20 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from src.api_client.chains import DEFAULT_CHAIN_KEY, SUPPORTED_CHAINS
+
+ChainKey = Literal["ethereum", "arbitrum"]
+# Fail fast bei Drift zwischen der Chain-Registry (Quelle der Wahrheit,
+# src/api_client/chains.py) und diesem Literal-Type (fuer OpenAPI-Schema
+# und Pydantic-Validierung noetig, da Literal keine dynamische Liste erlaubt).
+assert set(ChainKey.__args__) == set(SUPPORTED_CHAINS), "ChainKey weicht von SUPPORTED_CHAINS ab"
+
 
 class ImportRequest(BaseModel):
     addresses: list[str] = Field(..., min_length=1)
+    # Default haelt bestehende Clients (ohne chain-Feld) unveraendert
+    # lauffaehig - siehe src/api_client/chains.py fuer die Chain-Liste.
+    chain: ChainKey = DEFAULT_CHAIN_KEY  # type: ignore[assignment]
 
 
 class ImportCreatedResponse(BaseModel):
@@ -38,6 +49,7 @@ class AddressProgressOut(BaseModel):
 
 class JobStatusResponse(BaseModel):
     job_id: str
+    chain: str
     state: JobState
     stage: str | None = None
     addresses: dict[str, AddressProgressOut] = Field(default_factory=dict)
@@ -52,6 +64,7 @@ class JobStatusResponse(BaseModel):
 
 class TransactionOut(BaseModel):
     wallet_address: str
+    chain: str
     tx_hash: str
     timestamp: datetime
     category: str

@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from src.api_client.chains import DEFAULT_CHAIN_KEY, get_chain
 from src.api_client.etherscan_client import EtherscanClient
 from src.cli import CATEGORIES, run_import
 from src.models import CanonicalTransaction, TxCategory
@@ -53,6 +54,7 @@ class AddressProgress:
 class Job:
     id: str
     addresses: list[str]
+    chain: str = DEFAULT_CHAIN_KEY
     state: str = "queued"  # queued | running | done | error
     stage: str | None = None  # fetching | classifying | validating | exporting
     address_progress: dict[str, AddressProgress] = field(default_factory=dict)
@@ -71,12 +73,12 @@ _jobs: dict[str, Job] = {}
 _jobs_lock = threading.Lock()
 
 
-def create_job(addresses: list[str], client: EtherscanClient) -> str:
+def create_job(addresses: list[str], client: EtherscanClient, chain: str = DEFAULT_CHAIN_KEY) -> str:
     """Legt einen neuen Job an und startet ihn sofort in einem
     Hintergrund-Thread. Gibt die job_id zurück, ohne auf den Abschluss zu
     warten (Fortschritt wird über get_job()/to_status_response() gepollt)."""
     job_id = str(uuid.uuid4())
-    job = Job(id=job_id, addresses=list(addresses))
+    job = Job(id=job_id, addresses=list(addresses), chain=chain)
     for address in addresses:
         job.address_progress[address] = AddressProgress(
             categories={c.value: CategoryProgress() for c in CATEGORIES}
@@ -109,6 +111,7 @@ def _execute_job(job: Job, client: EtherscanClient) -> None:
             raw_dir=DEFAULT_RAW_DIR,
             processed_dir=DEFAULT_PROCESSED_DIR,
             run_id=job.id,
+            chain=get_chain(job.chain),
             progress_callback=on_progress,
         )
     except Exception as exc:  # noqa: BLE001 - Job-Fehler muss sichtbar werden, darf den Thread nicht crashen lassen
@@ -208,6 +211,7 @@ def to_status_response(job: Job) -> dict[str, Any]:
     with job.lock:
         return {
             "job_id": job.id,
+            "chain": job.chain,
             "state": job.state,
             "stage": job.stage,
             "addresses": {

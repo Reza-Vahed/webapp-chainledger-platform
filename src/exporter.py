@@ -28,6 +28,7 @@ def _format_decimal(value: Any) -> str:
 
 CSV_COLUMNS = [
     "wallet_address",
+    "chain",
     "tx_hash",
     "timestamp",
     "category",
@@ -90,6 +91,7 @@ def _write_json(transactions: list[CanonicalTransaction], path: Path) -> None:
 def _to_csv_row(tx: CanonicalTransaction) -> dict[str, Any]:
     return {
         "wallet_address": tx.wallet_address,
+        "chain": tx.chain,
         "tx_hash": tx.tx_hash,
         "timestamp": tx.timestamp.isoformat(),
         "category": tx.category.value,
@@ -116,6 +118,7 @@ def transaction_to_dict(tx: CanonicalTransaction) -> dict[str, Any]:
     zwei Stellen gepflegt werden muss."""
     return {
         "wallet_address": tx.wallet_address,
+        "chain": tx.chain,
         "tx_hash": tx.tx_hash,
         "timestamp": tx.timestamp.isoformat(),
         "category": tx.category.value,

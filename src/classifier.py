@@ -26,22 +26,37 @@ logger = logging.getLogger(__name__)
 # Keys müssen lowercase sein - der Abgleich normalisiert tx.from_address
 # defensiv selbst (nicht auf Lowercasing durch den Normalizer verlassen).
 #
-# Bewusst kleine, dokumentierte Allowlist bekannter Staking-Contracts.
+# Chain-geschlüsselt (Key = CanonicalTransaction.chain, siehe
+# src/api_client/chains.py): Contract-Adressen sind chain-spezifisch,
+# eine Mainnet-Adresse darf auf einer anderen Chain nicht zufällig
+# denselben Vertrag bedeuten. Bewusst kleine, dokumentierte Allowlist
+# bekannter Staking-Contracts pro Chain - fehlt ein Eintrag für eine
+# Chain, fällt die Transaktion konsequent auf "Unklassifiziert" zurück
+# statt zu raten (siehe KNOWN_AIRDROP_CONTRACTS-Pattern unten).
 # Bekannte Einschränkung (MVP): Rebase-/Liquid-Staking-Token wie stETH
 # erzeugen Rewards teils über Balance-Rebasing statt klassischer Transfer-
 # Events und werden dadurch über die Etherscan-Account-API nicht
 # vollständig erfasst - siehe README.
-KNOWN_STAKING_CONTRACTS: dict[str, str] = {
-    "0xae7ab96520de3a18e5e111b5eaab095312d7fe84": "Lido: stETH Token",
-    "0xae78736cd615f374d3085123a210448e74fc639": "Rocket Pool: rETH Token",
+KNOWN_STAKING_CONTRACTS: dict[str, dict[str, str]] = {
+    "ethereum": {
+        "0xae7ab96520de3a18e5e111b5eaab095312d7fe84": "Lido: stETH Token",
+        "0xae78736cd615f374d3085123a210448e74fc639": "Rocket Pool: rETH Token",
+    },
+    # Arbitrum: noch keine recherchierte, verlässliche Allowlist - bewusst
+    # leer statt spekulativ befüllt (siehe KNOWN_AIRDROP_CONTRACTS-Prinzip).
+    "arbitrum": {},
 }
 
 # Bewusst leere Allowlist für bekannte Airdrop-Distributor-Contracts im
-# MVP: Airdrop-Contracts sind i. d. R. projektspezifische Einmal-
-# Deployments ohne verlässliche generische On-Chain-Signatur. Statt eine
-# unsichere Heuristik zu raten, bleibt diese Liste leer/erweiterbar -
-# Treffer landen konsequent in "Unklassifiziert".
-KNOWN_AIRDROP_CONTRACTS: dict[str, str] = {}
+# MVP (chain-geschlüsselt wie KNOWN_STAKING_CONTRACTS): Airdrop-Contracts
+# sind i. d. R. projektspezifische Einmal-Deployments ohne verlässliche
+# generische On-Chain-Signatur. Statt eine unsichere Heuristik zu raten,
+# bleibt diese Liste leer/erweiterbar - Treffer landen konsequent in
+# "Unklassifiziert".
+KNOWN_AIRDROP_CONTRACTS: dict[str, dict[str, str]] = {
+    "ethereum": {},
+    "arbitrum": {},
+}
 
 
 def classify_transactions(
@@ -97,12 +112,12 @@ def _classify_single(tx: CanonicalTransaction, is_swap_pattern: bool) -> Canonic
         extra_warnings.append(
             "info: Swap-Muster (mehrere Legs im selben tx_hash) erkannt, Kauf/Verkauf-Zuordnung nicht ermittelt"
         )
-    elif tx.direction == "in" and tx.from_address.lower() in KNOWN_STAKING_CONTRACTS:
+    elif tx.direction == "in" and tx.from_address.lower() in KNOWN_STAKING_CONTRACTS.get(tx.chain, {}):
         category, confidence = TxCategory.STAKING_REWARD, 0.9
     elif (
         tx.record_type == SourceRecordType.ERC20
         and tx.direction == "in"
-        and tx.from_address.lower() in KNOWN_AIRDROP_CONTRACTS
+        and tx.from_address.lower() in KNOWN_AIRDROP_CONTRACTS.get(tx.chain, {})
     ):
         category, confidence = TxCategory.AIRDROP, 0.9
     elif tx.record_type == SourceRecordType.NORMAL and not _is_empty_input(tx.input_data) and tx.amount == 0:

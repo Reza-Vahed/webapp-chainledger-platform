@@ -30,15 +30,26 @@ def normalize_transactions(
     record_type: SourceRecordType,
     wallet_address: str,
     source: str = "etherscan",
+    chain: str = "ethereum",
+    native_symbol: str = ETH_SYMBOL,
+    native_decimals: int = ETH_DECIMALS,
 ) -> list[CanonicalTransaction]:
     """Normalisiert eine Liste roher API-Datensätze EINER Kategorie für
-    EINE Wallet. Reihenfolge der Eingabe bleibt erhalten."""
+    EINE Wallet. Reihenfolge der Eingabe bleibt erhalten.
+
+    native_symbol/native_decimals gelten für "normal"/"internal" (das
+    native Gas-Token der jeweiligen Chain, siehe src/api_client/chains.py)
+    - ERC20-Transfers lesen Symbol/Decimals weiterhin aus den Rohdaten,
+    unabhängig von der Chain.
+    """
     wallet_lower = wallet_address.lower()
     normalized: list[CanonicalTransaction] = []
 
     for raw in raw_txs:
         try:
-            tx = _normalize_single(raw, record_type, wallet_lower, wallet_address, source)
+            tx = _normalize_single(
+                raw, record_type, wallet_lower, wallet_address, source, chain, native_symbol, native_decimals
+            )
         except (KeyError, InvalidOperation, ValueError, TypeError) as exc:
             logger.warning(
                 "Überspringe fehlerhaften Rohdatensatz (record_type=%s hash=%s): %s",
@@ -56,6 +67,9 @@ def _normalize_single(
     wallet_lower: str,
     wallet_address: str,
     source: str,
+    chain: str,
+    native_symbol: str,
+    native_decimals: int,
 ) -> CanonicalTransaction:
     from_addr = str(raw.get("from", "")).lower()
     to_addr_raw = raw.get("to")
@@ -87,12 +101,12 @@ def _normalize_single(
         contract_raw = raw.get("contractAddress")
         token_contract_address = str(contract_raw).lower() if contract_raw else None
     else:
-        token_symbol = ETH_SYMBOL
-        token_decimals = ETH_DECIMALS
-        amount = _to_decimal(raw.get("value", "0"), ETH_DECIMALS)
+        token_symbol = native_symbol
+        token_decimals = native_decimals
+        amount = _to_decimal(raw.get("value", "0"), native_decimals)
         token_contract_address = None
         if record_type == SourceRecordType.NORMAL:
-            gas_fee_eth = _compute_gas_fee(raw)
+            gas_fee_eth = _compute_gas_fee(raw, native_decimals)
             input_data = raw.get("input")
 
     return CanonicalTransaction(
@@ -100,6 +114,7 @@ def _normalize_single(
         tx_hash=raw["hash"],
         record_type=record_type,
         source=source,
+        chain=chain,
         timestamp=timestamp,
         block_number=block_number,
         from_address=from_addr,
@@ -124,10 +139,10 @@ def _to_decimal(raw_value: Any, decimals: int) -> Decimal:
     return Decimal(str(raw_value)) / (Decimal(10) ** decimals)
 
 
-def _compute_gas_fee(raw: dict[str, Any]) -> Decimal | None:
+def _compute_gas_fee(raw: dict[str, Any], native_decimals: int) -> Decimal | None:
     gas_used = raw.get("gasUsed")
     gas_price = raw.get("gasPrice")
     if gas_used is None or gas_price is None:
         return None
     wei_fee = Decimal(str(gas_used)) * Decimal(str(gas_price))
-    return wei_fee / (Decimal(10) ** ETH_DECIMALS)
+    return wei_fee / (Decimal(10) ** native_decimals)

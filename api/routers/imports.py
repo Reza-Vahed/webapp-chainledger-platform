@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from api import jobs
-from api.dependencies import get_etherscan_client
+from api.dependencies import get_import_client
 from api.schemas import (
     ImportCreatedResponse,
     ImportRequest,
@@ -28,9 +28,9 @@ router = APIRouter(prefix="/api/v1/imports", tags=["imports"])
 @router.post("", response_model=ImportCreatedResponse, status_code=202)
 def create_import(
     payload: ImportRequest,
-    client: EtherscanClient = Depends(get_etherscan_client),
+    client: EtherscanClient = Depends(get_import_client),
 ) -> ImportCreatedResponse:
-    job_id = jobs.create_job(payload.addresses, client)
+    job_id = jobs.create_job(payload.addresses, client, payload.chain)
     return ImportCreatedResponse(job_id=job_id)
 
 

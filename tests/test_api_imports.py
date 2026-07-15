@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api import jobs
-from api.dependencies import get_etherscan_client
+from api.dependencies import get_import_client
 from api.main import app
 
 WALLET = "0x1111111111111111111111111111111111111111"
@@ -104,7 +104,7 @@ class _MultiTxFakeClient:
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(jobs, "DEFAULT_RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(jobs, "DEFAULT_PROCESSED_DIR", tmp_path / "processed")
-    app.dependency_overrides[get_etherscan_client] = lambda: _FakeClient()
+    app.dependency_overrides[get_import_client] = lambda: _FakeClient()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -194,7 +194,7 @@ def test_transactions_filtering_by_category(client: TestClient):
 
 
 def test_transactions_sorting_by_amount(client: TestClient):
-    app.dependency_overrides[get_etherscan_client] = lambda: _MultiTxFakeClient()
+    app.dependency_overrides[get_import_client] = lambda: _MultiTxFakeClient()
     create_resp = client.post("/api/v1/imports", json={"addresses": [WALLET]})
     job_id = create_resp.json()["job_id"]
     _wait_for_completion(client, job_id)
@@ -207,10 +207,39 @@ def test_transactions_sorting_by_amount(client: TestClient):
 
 
 def test_transactions_default_sort_is_timestamp_desc(client: TestClient):
-    app.dependency_overrides[get_etherscan_client] = lambda: _MultiTxFakeClient()
+    app.dependency_overrides[get_import_client] = lambda: _MultiTxFakeClient()
     create_resp = client.post("/api/v1/imports", json={"addresses": [WALLET]})
     job_id = create_resp.json()["job_id"]
     _wait_for_completion(client, job_id)
 
     resp = client.get(f"/api/v1/imports/{job_id}/transactions")
     assert [item["tx_hash"] for item in resp.json()["items"]] == ["0xbig", "0xsmall"]
+
+
+def test_create_import_without_chain_field_defaults_to_ethereum(client: TestClient):
+    """Rueckwaertskompatibilitaet: bestehende Clients, die kein chain-Feld
+    senden, muessen weiterhin funktionieren (Default: ethereum)."""
+    create_resp = client.post("/api/v1/imports", json={"addresses": [WALLET]})
+    job_id = create_resp.json()["job_id"]
+
+    status = _wait_for_completion(client, job_id)
+    assert status["chain"] == "ethereum"
+
+    tx_resp = client.get(f"/api/v1/imports/{job_id}/transactions")
+    assert tx_resp.json()["items"][0]["chain"] == "ethereum"
+
+
+def test_create_import_with_arbitrum_chain_is_tagged_on_transactions(client: TestClient):
+    create_resp = client.post("/api/v1/imports", json={"addresses": [WALLET], "chain": "arbitrum"})
+    job_id = create_resp.json()["job_id"]
+
+    status = _wait_for_completion(client, job_id)
+    assert status["chain"] == "arbitrum"
+
+    tx_resp = client.get(f"/api/v1/imports/{job_id}/transactions")
+    assert tx_resp.json()["items"][0]["chain"] == "arbitrum"
+
+
+def test_create_import_rejects_unknown_chain(client: TestClient):
+    resp = client.post("/api/v1/imports", json={"addresses": [WALLET], "chain": "not-a-real-chain"})
+    assert resp.status_code == 422

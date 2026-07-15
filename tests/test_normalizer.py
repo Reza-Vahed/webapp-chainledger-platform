@@ -79,6 +79,36 @@ def test_normalize_flags_failed_transaction():
     assert any("isError" in w for w in tx.warnings)
 
 
+def test_normalize_defaults_chain_to_ethereum_for_backward_compatibility():
+    raw = {
+        "blockNumber": "18000000", "timeStamp": "1700000000", "hash": "0xabc",
+        "from": "0x2222222222222222222222222222222222222222", "to": WALLET,
+        "value": "1000000000000000000", "gas": "21000", "gasPrice": "1",
+        "gasUsed": "21000", "isError": "0", "input": "0x",
+    }
+
+    [tx] = normalize_transactions([raw], SourceRecordType.NORMAL, WALLET)
+
+    assert tx.chain == "ethereum"
+
+
+def test_normalize_applies_configured_chain_and_native_symbol():
+    raw = {
+        "blockNumber": "1", "timeStamp": "1700000000", "hash": "0xabc",
+        "from": "0x2222222222222222222222222222222222222222", "to": WALLET,
+        "value": "1000000000000000000", "gas": "21000", "gasPrice": "1",
+        "gasUsed": "21000", "isError": "0", "input": "0x",
+    }
+
+    [tx] = normalize_transactions(
+        [raw], SourceRecordType.NORMAL, WALLET, chain="arbitrum", native_symbol="ETH", native_decimals=18
+    )
+
+    assert tx.chain == "arbitrum"
+    assert tx.token_symbol == "ETH"
+    assert tx.amount == Decimal("1")
+
+
 def test_normalize_skips_malformed_record_and_logs(caplog):
     raw_valid = {
         "blockNumber": "18000003",

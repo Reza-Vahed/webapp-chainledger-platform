@@ -54,6 +54,10 @@ class CanonicalTransaction(BaseModel):
     tx_hash: str
     record_type: SourceRecordType
     source: str = "etherscan"
+    # Chain-Key aus src/api_client/chains.py (z. B. "ethereum", "arbitrum").
+    # Default "ethereum" haelt bestehende Aufrufer/Tests ohne chain-Angabe
+    # unveraendert lauffaehig.
+    chain: str = "ethereum"
 
     # Zeit- und Block-Kontext
     timestamp: datetime

@@ -27,6 +27,7 @@ import requests
 from dotenv import load_dotenv
 
 from src.api_client.base import BlockchainDataSource, RawResponseSink, TransactionCategory
+from src.api_client.chains import ChainConfig, get_chain
 from src.api_client.exceptions import EtherscanAPIError, RateLimitExceededError
 
 logger = logging.getLogger(__name__)
@@ -94,11 +95,17 @@ class EtherscanClient(BlockchainDataSource):
         self._session = session or requests.Session()
 
     @classmethod
-    def from_env(cls, env_file: Path | None = None) -> "EtherscanClient":
+    def from_env(cls, chain: ChainConfig | None = None, env_file: Path | None = None) -> "EtherscanClient":
         """Baut einen Client aus Umgebungsvariablen / einer .env-Datei.
 
         Lädt niemals einen API-Key mit Default - fehlt der Key, wird
         explizit ein Fehler geworfen statt stillschweigend zu raten.
+
+        chain wählt die Chain über deren "chainid" (Etherscan V2 deckt
+        mehrere EVM-Chains über denselben Endpunkt/API-Key ab - siehe
+        src/api_client/chains.py). Default: Ethereum Mainnet, damit
+        bestehende Aufrufer (CLI ohne --chain, alte API-Requests)
+        unverändert funktionieren.
         """
         load_dotenv(dotenv_path=env_file)
         api_key = os.environ.get("ETHERSCAN_API_KEY")
@@ -106,10 +113,14 @@ class EtherscanClient(BlockchainDataSource):
             raise ValueError(
                 "ETHERSCAN_API_KEY nicht gesetzt. Bitte .env anlegen (siehe .env.example)."
             )
+        resolved_chain = chain or get_chain("ethereum")
         return cls(
             api_key=api_key,
             base_url=os.environ.get("ETHERSCAN_BASE_URL", cls.DEFAULT_BASE_URL),
-            chain_id=int(os.environ.get("ETHERSCAN_CHAIN_ID", cls.DEFAULT_CHAIN_ID)),
+            chain_id=resolved_chain.chain_id,
+            # Live verifiziert (siehe docs/adr/0004): das Rate-Limit gilt pro
+            # API-Key ueber ALLE Chains hinweg gemeinsam, nicht pro Chain -
+            # deshalb ein einziger globaler Override statt pro-Chain-Werten.
             rate_limit_rps=float(os.environ.get("ETHERSCAN_RATE_LIMIT_RPS", 3.0)),
         )
 

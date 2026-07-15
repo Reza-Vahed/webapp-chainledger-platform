@@ -78,7 +78,7 @@ def test_erc20_in_and_erc20_out_same_hash_is_classified_as_swap():
 
 
 def test_erc20_in_from_known_staking_contract_is_staking_reward():
-    staking_contract = next(iter(KNOWN_STAKING_CONTRACTS))
+    staking_contract = next(iter(KNOWN_STAKING_CONTRACTS["ethereum"]))
     tx = make_tx(
         record_type=SourceRecordType.ERC20, direction="in",
         from_address=staking_contract, to_address=WALLET, token_symbol="stETH",
@@ -89,7 +89,7 @@ def test_erc20_in_from_known_staking_contract_is_staking_reward():
 
 
 def test_erc20_in_from_known_staking_contract_checksum_case_is_still_matched():
-    staking_contract_lower = next(iter(KNOWN_STAKING_CONTRACTS))
+    staking_contract_lower = next(iter(KNOWN_STAKING_CONTRACTS["ethereum"]))
     checksum_case_address = "0x" + "".join(
         c.upper() if i % 2 == 0 else c for i, c in enumerate(staking_contract_lower[2:])
     )
@@ -99,6 +99,20 @@ def test_erc20_in_from_known_staking_contract_checksum_case_is_still_matched():
     )
     [result] = classify_transactions([tx])
     assert result.category == TxCategory.STAKING_REWARD
+
+
+def test_known_ethereum_staking_contract_is_not_matched_on_a_different_chain():
+    """Regression: KNOWN_STAKING_CONTRACTS ist chain-geschlüsselt - eine
+    Mainnet-Allowlist-Adresse darf auf einer anderen Chain nicht
+    faelschlich als derselbe Vertrag gelten (ungeprueft, spekulativ)."""
+    mainnet_staking_contract = next(iter(KNOWN_STAKING_CONTRACTS["ethereum"]))
+    tx = make_tx(
+        record_type=SourceRecordType.ERC20, direction="in",
+        from_address=mainnet_staking_contract, to_address=WALLET, token_symbol="stETH",
+        chain="arbitrum",
+    )
+    [result] = classify_transactions([tx])
+    assert result.category != TxCategory.STAKING_REWARD
 
 
 def test_erc20_in_from_unknown_contract_is_not_guessed_as_staking_or_airdrop():

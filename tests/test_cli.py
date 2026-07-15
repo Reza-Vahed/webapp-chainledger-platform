@@ -10,7 +10,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from src.cli import make_raw_sink, run_import
+import pytest
+
+from src.api_client.chains import get_chain
+from src.cli import _parse_args, make_raw_sink, run_import
 
 
 def test_raw_sink_persists_response_unmodified(tmp_path: Path):
@@ -99,3 +102,56 @@ def test_run_import_works_without_progress_callback(tmp_path: Path):
     assert validated == []
     assert csv_path.exists()
     assert json_path.exists()
+
+
+def test_parse_args_default_chain_is_ethereum():
+    args = _parse_args(["0x1111111111111111111111111111111111111111"])
+    assert args.chain == "ethereum"
+
+
+def test_parse_args_accepts_chain_flag():
+    args = _parse_args(["0x1111111111111111111111111111111111111111", "--chain", "arbitrum"])
+    assert args.chain == "arbitrum"
+
+
+def test_parse_args_rejects_unknown_chain():
+    with pytest.raises(SystemExit):
+        _parse_args(["0x1111111111111111111111111111111111111111", "--chain", "not-a-real-chain"])
+
+
+def test_make_raw_sink_filename_includes_chain(tmp_path: Path):
+    raw_dir = tmp_path / "raw"
+    sink = make_raw_sink(raw_dir, run_id="run1", chain="arbitrum")
+
+    sink("normal", "0xWALLET0000000000000000000000000000000000", 1, {"result": []})
+
+    [path] = list(raw_dir.glob("*.json"))
+    assert "arbitrum" in path.name
+
+
+def test_run_import_tags_transactions_with_configured_chain(tmp_path: Path):
+    class _OneNormalTxClient:
+        def fetch_transactions(self, address, category, raw_response_sink=None):
+            if category != "normal":
+                return []
+            tx = {
+                "hash": "0xabc", "blockNumber": "1", "timeStamp": "1700000000",
+                "from": "0x2222222222222222222222222222222222222222", "to": address,
+                "value": "1000000000000000000", "gas": "21000", "gasPrice": "1",
+                "gasUsed": "21000", "isError": "0", "input": "0x",
+            }
+            data = {"status": "1", "message": "OK", "result": [tx]}
+            if raw_response_sink is not None:
+                raw_response_sink(category, address, 1, data)
+            return [tx]
+
+    _, _, validated = run_import(
+        addresses=["0x1111111111111111111111111111111111111111"],
+        client=_OneNormalTxClient(),
+        raw_dir=tmp_path / "raw",
+        processed_dir=tmp_path / "processed",
+        run_id="test-run-arbitrum",
+        chain=get_chain("arbitrum"),
+    )
+
+    assert [tx.chain for tx in validated] == ["arbitrum"]

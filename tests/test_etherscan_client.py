@@ -170,3 +170,16 @@ def test_api_error_raises_etherscan_api_error():
 def test_missing_api_key_raises_value_error():
     with pytest.raises(ValueError):
         EtherscanClient(api_key="")
+
+
+def test_fetch_transactions_passes_configured_chain_id():
+    from src.api_client.chains import get_chain
+
+    session = MagicMock()
+    session.get.return_value = make_response({"status": "1", "message": "OK", "result": []})
+
+    client = make_client(session, chain_id=get_chain("arbitrum").chain_id)
+    client.fetch_transactions("0xWallet", "normal")
+
+    call_params = session.get.call_args.kwargs["params"]
+    assert call_params["chainid"] == 42161

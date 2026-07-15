@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from src.api_client.chains import DEFAULT_CHAIN_KEY, SUPPORTED_CHAINS, ChainConfig, get_chain
 from src.api_client.etherscan_client import EtherscanClient
 from src.api_client.exceptions import EtherscanAPIError
 from src.classifier import classify_transactions
@@ -46,14 +47,19 @@ CATEGORIES: tuple[SourceRecordType, ...] = (
 ADDRESS_PATTERN = re.compile(r"^0x[a-fA-F0-9]{40}$")
 
 
-def make_raw_sink(raw_dir: Path, run_id: str) -> Callable[[str, str, int, dict[str, Any]], None]:
+def make_raw_sink(
+    raw_dir: Path, run_id: str, chain: str = DEFAULT_CHAIN_KEY
+) -> Callable[[str, str, int, dict[str, Any]], None]:
     """Baut den Callback, der jede rohe API-Antwortseite unveraendert unter
     data/raw/ ablegt (Anforderung: Auditierbarkeit). Der Client selbst hat
-    keine Kenntnis vom Dateisystem-Layout - siehe api_client/base.py."""
+    keine Kenntnis vom Dateisystem-Layout - siehe api_client/base.py.
+
+    chain wird Teil des Dateinamens, damit ein Import derselben Adresse auf
+    zwei Chains im selben run_id-Namensraum nicht kollidiert."""
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     def sink(category: str, address: str, page: int, data: dict[str, Any]) -> None:
-        filename = f"{run_id}_{address.lower()}_{category}_page{page:04d}.json"
+        filename = f"{run_id}_{chain}_{address.lower()}_{category}_page{page:04d}.json"
         path = raw_dir / filename
         with path.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -71,22 +77,28 @@ def run_import(
     raw_dir: Path,
     processed_dir: Path,
     run_id: str,
+    chain: ChainConfig | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> tuple[Path, Path, list[CanonicalTransaction]]:
     """Führt die volle Pipeline für eine oder mehrere Wallets aus und
     liefert die Pfade zu CSV/JSON sowie die validierten Transaktionen.
+
+    chain waehlt die Chain-Konfiguration (native Symbol/Decimals fuer
+    "normal"/"internal", siehe src/api_client/chains.py). Default: Ethereum
+    Mainnet, damit bestehende Aufrufer unveraendert funktionieren.
 
     progress_callback ist optional und rein additiv (Default None, CLI-
     Verhalten unveraendert) - wird u. a. vom Web-Backend (api/jobs.py)
     genutzt, um Live-Fortschritt fuer Polling bereitzustellen, ohne die
     Pipeline-Module selbst anzufassen.
     """
+    resolved_chain = chain or get_chain(DEFAULT_CHAIN_KEY)
 
     def report(event: str, **kwargs: Any) -> None:
         if progress_callback is not None:
             progress_callback({"event": event, **kwargs})
 
-    raw_sink = make_raw_sink(raw_dir, run_id)
+    raw_sink = make_raw_sink(raw_dir, run_id, resolved_chain.key)
     all_normalized: list[CanonicalTransaction] = []
 
     for address in addresses:
@@ -116,7 +128,14 @@ def run_import(
                 )
                 report("category_error", address=address, category=category.value, error=str(exc))
                 continue
-            normalized = normalize_transactions(raw_txs, category, address)
+            normalized = normalize_transactions(
+                raw_txs,
+                category,
+                address,
+                chain=resolved_chain.key,
+                native_symbol=resolved_chain.native_symbol,
+                native_decimals=resolved_chain.native_decimals,
+            )
             logger.info(
                 "Normalisiert: address=%s category=%s anzahl=%s", address, category.value, len(normalized)
             )
@@ -146,11 +165,12 @@ def run_import(
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    chain = get_chain(args.chain)
 
     configure_logging(log_file=args.log_dir / f"run_{run_id}.log")
 
     try:
-        client = EtherscanClient.from_env(env_file=args.env_file)
+        client = EtherscanClient.from_env(chain=chain, env_file=args.env_file)
     except ValueError as exc:
         logger.error("Konfigurationsfehler: %s", exc)
         print(f"Fehler: {exc}", file=sys.stderr)
@@ -162,6 +182,7 @@ def main(argv: list[str] | None = None) -> int:
         raw_dir=args.raw_dir,
         processed_dir=args.processed_dir,
         run_id=run_id,
+        chain=chain,
     )
 
     print(f"Import abgeschlossen: {len(validated)} Transaktionen verarbeitet.")
@@ -172,9 +193,13 @@ def main(argv: list[str] | None = None) -> int:
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Krypto-Steuer-Datenimport-Agent (Ethereum Mainnet, read-only, MVP)."
+        description="Krypto-Steuer-Datenimport-Agent (EVM-Chains, read-only, MVP)."
     )
-    parser.add_argument("addresses", nargs="+", help="Eine oder mehrere Ethereum-Wallet-Adressen (0x...)")
+    parser.add_argument("addresses", nargs="+", help="Eine oder mehrere EVM-Wallet-Adressen (0x...)")
+    parser.add_argument(
+        "--chain", choices=sorted(SUPPORTED_CHAINS), default=DEFAULT_CHAIN_KEY,
+        help=f"Ziel-Chain (Default: {DEFAULT_CHAIN_KEY})",
+    )
     parser.add_argument(
         "--env-file", type=Path, default=None,
         help="Pfad zu einer .env-Datei (Default: .env im Projektverzeichnis / Umgebungsvariablen)",

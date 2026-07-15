@@ -150,7 +150,27 @@ body {
 
 .address-form__row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.chain-select {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.chain-select select {
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 0.9rem;
 }
 
 .address-form input {
@@ -198,6 +218,7 @@ body {
   font-size: 1.1rem;
 }
 
+.job-progress__chain,
 .job-progress__stage {
   color: var(--fg-muted);
 }
@@ -413,3 +434,75 @@ body {
 .category-pill--slot-5 { background: var(--series-5); }
 .category-pill--slot-6 { background: var(--series-6); }
 .category-pill--slot-7 { background: var(--series-7); }
+
+/* Import-Historie (Schritt 4) */
+
+.history {
+  margin-block-start: 2.5rem;
+}
+
+.history h2 {
+  font-size: 1.1rem;
+}
+
+.history__loading,
+.history__empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--fg-muted);
+}
+
+.history__table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.history__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.history__table th,
+.history__table td {
+  padding: 0.55rem 0.75rem;
+  text-align: start;
+  border-block-end: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.history__table thead th {
+  background: var(--surface);
+}
+
+.history__addresses {
+  font-family: ui-monospace, monospace;
+  color: var(--fg-muted);
+  cursor: help;
+}
+
+.history__numeric {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, monospace;
+}
+
+.history__actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.history__actions button {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.history__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

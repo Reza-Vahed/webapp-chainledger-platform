@@ -19,6 +19,7 @@ export interface AddressProgress {
 
 export interface JobStatusResponse {
   job_id: string;
+  chain: string;
   state: JobState;
   stage: string | null;
   addresses: Record<string, AddressProgress>;
@@ -37,6 +38,7 @@ export interface ImportCreatedResponse {
 
 export interface TransactionOut {
   wallet_address: string;
+  chain: string;
   tx_hash: string;
   timestamp: string;
   category: string;
@@ -60,4 +62,22 @@ export interface TransactionsPage {
   total: number;
   page: number;
   page_size: number;
+}
+
+export interface ImportSummary {
+  job_id: string;
+  chain: string;
+  addresses: string[];
+  state: JobState;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
+  total_transactions: number | null;
+  unclassified_count: number | null;
+  csv_available: boolean;
+  json_available: boolean;
+}
+
+export interface ImportListResponse {
+  items: ImportSummary[];
 }

@@ -11,6 +11,7 @@ export function JobProgress({ status }: JobProgressProps) {
   return (
     <section className="job-progress" aria-live="polite">
       <h2>{t("jobProgress.statusLabel", { state: t(`state.${status.state}`) })}</h2>
+      <p className="job-progress__chain">{t("jobProgress.chainLabel", { chain: t(`chain.${status.chain}`) })}</p>
       {status.stage && <p className="job-progress__stage">{t("jobProgress.stageLabel", { stage: t(`stage.${status.stage}`) })}</p>}
       {status.error && (
         <p className="form-error" role="alert">

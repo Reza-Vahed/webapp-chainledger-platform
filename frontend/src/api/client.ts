@@ -2,7 +2,12 @@
 // Etherscan - der API-Key existiert ausschließlich serverseitig (siehe
 // api/dependencies.py).
 
-import type { ImportCreatedResponse, JobStatusResponse, TransactionsPage } from "../types";
+import type {
+  ImportCreatedResponse,
+  ImportListResponse,
+  JobStatusResponse,
+  TransactionsPage,
+} from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -32,14 +37,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new ApiError(detail, response.status);
   }
 
+  if (response.status === 204) {
+    // Kein Body (z. B. DELETE) - response.json() wuerde hier werfen.
+    return undefined as T;
+  }
   return response.json() as Promise<T>;
 }
 
-export function createImport(addresses: string[]): Promise<ImportCreatedResponse> {
+export function createImport(addresses: string[], chain: string): Promise<ImportCreatedResponse> {
   return request<ImportCreatedResponse>("/api/v1/imports", {
     method: "POST",
-    body: JSON.stringify({ addresses }),
+    body: JSON.stringify({ addresses, chain }),
   });
+}
+
+export function listImports(): Promise<ImportListResponse> {
+  return request<ImportListResponse>("/api/v1/imports");
+}
+
+export function deleteImport(jobId: string): Promise<void> {
+  return request<void>(`/api/v1/imports/${jobId}`, { method: "DELETE" });
 }
 
 export function getImportStatus(jobId: string): Promise<JobStatusResponse> {

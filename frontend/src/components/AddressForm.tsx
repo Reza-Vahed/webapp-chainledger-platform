@@ -1,18 +1,22 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { DEFAULT_CHAIN, type ChainKey } from "../chains";
+import { ChainSelect } from "./ChainSelect";
 
 // Gleiches Muster wie ADDRESS_PATTERN im Backend (src/cli.py) - clientseitig
-// nur fuer schnelles Feedback, das Backend validiert ohnehin nochmal.
+// nur fuer schnelles Feedback, das Backend validiert ohnehin nochmal. Das
+// 0x+40-Hex-Format ist chain-uebergreifend identisch (EVM-Adressformat).
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 
 interface AddressFormProps {
-  onSubmit: (address: string) => void;
+  onSubmit: (address: string, chain: ChainKey) => void;
   disabled: boolean;
 }
 
 export function AddressForm({ onSubmit, disabled }: AddressFormProps) {
   const { t } = useTranslation();
   const [address, setAddress] = useState("");
+  const [chain, setChain] = useState<ChainKey>(DEFAULT_CHAIN);
   const [hasValidationError, setHasValidationError] = useState(false);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -23,7 +27,7 @@ export function AddressForm({ onSubmit, disabled }: AddressFormProps) {
       return;
     }
     setHasValidationError(false);
-    onSubmit(trimmed);
+    onSubmit(trimmed, chain);
   }
 
   return (
@@ -40,6 +44,7 @@ export function AddressForm({ onSubmit, disabled }: AddressFormProps) {
           spellCheck={false}
           autoComplete="off"
         />
+        <ChainSelect value={chain} onChange={setChain} disabled={disabled} />
         <button type="submit" disabled={disabled || address.trim().length === 0}>
           {disabled ? t("addressForm.submitting") : t("addressForm.submit")}
         </button>

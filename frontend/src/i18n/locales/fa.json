@@ -3,11 +3,18 @@
     "title": "ChainLedger Platform"
   },
   "addressForm": {
-    "label": "آدرس کیف‌پول اتریوم",
+    "label": "آدرس کیف‌پول",
     "placeholder": "0x...",
-    "validationError": "لطفاً یک آدرس معتبر اتریوم وارد کنید (0x + 40 کاراکتر هگزادسیمال).",
+    "validationError": "لطفاً یک آدرس کیف‌پول معتبر وارد کنید (0x + 40 کاراکتر هگزادسیمال).",
     "submit": "شروع ایمپورت",
     "submitting": "در حال اجرا…"
+  },
+  "chainSelect": {
+    "label": "شبکه"
+  },
+  "chain": {
+    "ethereum": "اتریوم (شبکه اصلی)",
+    "arbitrum": "آربیتروم وان"
   },
   "errors": {
     "importStartFailed": "شروع ایمپورت با خطا مواجه شد.",
@@ -16,6 +23,7 @@
   },
   "jobProgress": {
     "statusLabel": "وضعیت: {{state}}",
+    "chainLabel": "شبکه: {{chain}}",
     "stageLabel": "مرحله: {{stage}}",
     "errorLabel": "خطا: {{error}}",
     "transactionsCount_one": "{{count}} تراکنش",
@@ -83,5 +91,20 @@
   },
   "language": {
     "label": "تغییر زبان"
+  },
+  "history": {
+    "title": "تاریخچه ایمپورت",
+    "loading": "در حال بارگذاری…",
+    "empty": "هنوز ایمپورتی وجود ندارد.",
+    "fetchFailed": "بارگذاری تاریخچه با خطا مواجه شد.",
+    "deleteFailed": "حذف با خطا مواجه شد.",
+    "deleteConfirm": "این ایمپورت به همراه داده‌های ذخیره‌شده حذف شود؟",
+    "columnChain": "شبکه",
+    "columnAddresses": "آدرس(ها)",
+    "columnState": "وضعیت",
+    "columnStarted": "شروع",
+    "columnTotal": "تراکنش‌ها",
+    "reopen": "باز کردن",
+    "delete": "حذف"
   }
 }

@@ -3,11 +3,18 @@
     "title": "ChainLedger Platform"
   },
   "addressForm": {
-    "label": "Ethereum wallet address",
+    "label": "Wallet address",
     "placeholder": "0x...",
-    "validationError": "Please enter a valid Ethereum address (0x + 40 hex characters).",
+    "validationError": "Please enter a valid wallet address (0x + 40 hex characters).",
     "submit": "Start import",
     "submitting": "Running…"
+  },
+  "chainSelect": {
+    "label": "Chain"
+  },
+  "chain": {
+    "ethereum": "Ethereum Mainnet",
+    "arbitrum": "Arbitrum One"
   },
   "errors": {
     "importStartFailed": "Could not start the import.",
@@ -16,6 +23,7 @@
   },
   "jobProgress": {
     "statusLabel": "Status: {{state}}",
+    "chainLabel": "Chain: {{chain}}",
     "stageLabel": "Stage: {{stage}}",
     "errorLabel": "Error: {{error}}",
     "transactionsCount_one": "{{count}} transaction",
@@ -83,5 +91,20 @@
   },
   "language": {
     "label": "Change language"
+  },
+  "history": {
+    "title": "Import History",
+    "loading": "Loading…",
+    "empty": "No imports yet.",
+    "fetchFailed": "Could not load the import history.",
+    "deleteFailed": "Delete failed.",
+    "deleteConfirm": "Really delete this import, including its stored data?",
+    "columnChain": "Chain",
+    "columnAddresses": "Address(es)",
+    "columnState": "Status",
+    "columnStarted": "Started",
+    "columnTotal": "Transactions",
+    "reopen": "Open",
+    "delete": "Delete"
   }
 }

@@ -88,3 +88,25 @@ class TransactionsPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class ImportSummary(BaseModel):
+    """Eintrag der Import-Historie (GET /api/v1/imports) - Metadaten aus
+    der SQLite-Persistenz (api/db.py), unabhängig davon, ob der Job noch
+    im Prozess-Speicher liegt."""
+
+    job_id: str
+    chain: str
+    addresses: list[str]
+    state: JobState
+    error: str | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+    total_transactions: int | None = None
+    unclassified_count: int | None = None
+    csv_available: bool = False
+    json_available: bool = False
+
+
+class ImportListResponse(BaseModel):
+    items: list[ImportSummary]

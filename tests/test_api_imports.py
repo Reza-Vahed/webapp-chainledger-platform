@@ -104,6 +104,7 @@ class _MultiTxFakeClient:
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(jobs, "DEFAULT_RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(jobs, "DEFAULT_PROCESSED_DIR", tmp_path / "processed")
+    monkeypatch.setattr(jobs, "DEFAULT_DB_PATH", tmp_path / "test.db")
     app.dependency_overrides[get_import_client] = lambda: _FakeClient()
     with TestClient(app) as test_client:
         yield test_client
@@ -243,3 +244,91 @@ def test_create_import_with_arbitrum_chain_is_tagged_on_transactions(client: Tes
 def test_create_import_rejects_unknown_chain(client: TestClient):
     resp = client.post("/api/v1/imports", json={"addresses": [WALLET], "chain": "not-a-real-chain"})
     assert resp.status_code == 422
+
+
+def test_list_imports_returns_completed_job(client: TestClient):
+    create_resp = client.post("/api/v1/imports", json={"addresses": [WALLET], "chain": "arbitrum"})
+    job_id = create_resp.json()["job_id"]
+    _wait_for_completion(client, job_id)
+
+    resp = client.get("/api/v1/imports")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    [entry] = [item for item in items if item["job_id"] == job_id]
+    assert entry["chain"] == "arbitrum"
+    assert entry["state"] == "done"
+    assert entry["total_transactions"] == 1
+    assert entry["csv_available"] is True
+    assert entry["json_available"] is True
+
+
+def test_list_imports_orders_newest_first(client: TestClient):
+    first = client.post("/api/v1/imports", json={"addresses": [WALLET]}).json()["job_id"]
+    _wait_for_completion(client, first)
+    second = client.post("/api/v1/imports", json={"addresses": [WALLET]}).json()["job_id"]
+    _wait_for_completion(client, second)
+
+    resp = client.get("/api/v1/imports")
+    ids = [item["job_id"] for item in resp.json()["items"]]
+    assert ids.index(second) < ids.index(first)
+
+
+def test_delete_completed_import_removes_files_and_history_entry(client: TestClient):
+    create_resp = client.post("/api/v1/imports", json={"addresses": [WALLET]})
+    job_id = create_resp.json()["job_id"]
+    status = _wait_for_completion(client, job_id)
+    csv_path = Path(jobs.get_job(job_id).csv_path)
+    assert csv_path.exists()
+
+    del_resp = client.delete(f"/api/v1/imports/{job_id}")
+    assert del_resp.status_code == 204
+    assert not csv_path.exists()
+
+    assert client.get(f"/api/v1/imports/{job_id}").status_code == 404
+    ids = [item["job_id"] for item in client.get("/api/v1/imports").json()["items"]]
+    assert job_id not in ids
+
+
+def test_delete_unknown_import_returns_404(client: TestClient):
+    resp = client.delete("/api/v1/imports/does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_delete_running_import_returns_409(client: TestClient):
+    job = jobs.Job(id="running-job", addresses=[WALLET], state="running")
+    with jobs._jobs_lock:
+        jobs._jobs["running-job"] = job
+
+    resp = client.delete("/api/v1/imports/running-job")
+    assert resp.status_code == 409
+
+
+def test_completed_import_survives_simulated_restart(client: TestClient):
+    """Simuliert einen Backend-Neustart: der In-Memory-Cache wird geleert,
+    Metadaten (DB) und Transaktionen (JSON-Export) muessen weiterhin ueber
+    die API abrufbar sein."""
+    create_resp = client.post("/api/v1/imports", json={"addresses": [WALLET], "chain": "arbitrum"})
+    job_id = create_resp.json()["job_id"]
+    _wait_for_completion(client, job_id)
+
+    with jobs._jobs_lock:
+        jobs._jobs.clear()
+
+    status_resp = client.get(f"/api/v1/imports/{job_id}")
+    assert status_resp.status_code == 200
+    status = status_resp.json()
+    assert status["state"] == "done"
+    assert status["chain"] == "arbitrum"
+    assert status["total_transactions"] == 1
+    assert status["csv_available"] is True
+
+    tx_resp = client.get(f"/api/v1/imports/{job_id}/transactions")
+    assert tx_resp.status_code == 200
+    payload = tx_resp.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["tx_hash"] == "0xabc"
+    assert payload["items"][0]["chain"] == "arbitrum"
+
+    export_resp = client.get(f"/api/v1/imports/{job_id}/export/csv")
+    assert export_resp.status_code == 200
+    assert "0xabc" in export_resp.text

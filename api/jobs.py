@@ -1,16 +1,27 @@
-"""In-Memory Job-Verwaltung für asynchrone Import-Läufe.
+"""Job-Verwaltung für asynchrone Import-Läufe.
 
 Führt die bestehende Pipeline (src.cli.run_import) in einem Hintergrund-
 Thread aus, damit der FastAPI-Event-Loop für Status-Polling frei bleibt -
 ohne den (synchronen) API-Client/die Pipeline umzuschreiben.
 
-Bewusste MVP-Grenze (dokumentiert, nicht gelöst): Job-Status lebt nur im
-Prozess-Speicher (kein Neustart-/Multi-Worker-Support, kein Job-Eviction).
-Für ein Demo-Tool ohne Nutzerkonten ausreichend - siehe README.
+Laufende Jobs leben weiterhin primär im Prozess-Speicher (_jobs) - das
+hält das häufige Status-Polling (alle 1.5s) schnell und lock-nah wie
+bisher. Bei jedem Statusübergang wird zusätzlich ein Snapshot der
+Metadaten nach SQLite geschrieben (api/db.py, Write-Through), damit
+abgeschlossene Importe einen Neustart überstehen. Die Transaktionsdaten
+selbst werden NICHT dupliziert - sie liegen bereits vollständig in
+data/processed/transactions_<job_id>.json (siehe src/exporter.py) und
+werden bei Bedarf nach einem Neustart von dort zurückgelesen (siehe
+_load_job_from_store). Bekannte MVP-Grenze: kein Multi-Worker-Support
+(ein Prozess hält die laufenden Jobs im Speicher) und ein Job, der beim
+Absturz/Neustart des Backends gerade "running" war, bleibt in der
+Historie dauerhaft auf "running" stehen (keine Recovery-Heuristik) -
+siehe README.
 """
 
 from __future__ import annotations
 
+import json
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -18,6 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from api import db
 from src.api_client.chains import DEFAULT_CHAIN_KEY, get_chain
 from src.api_client.etherscan_client import EtherscanClient
 from src.cli import CATEGORIES, run_import
@@ -35,6 +47,7 @@ SORTABLE_FIELDS: dict[str, Callable[[CanonicalTransaction], Any]] = {
 DEFAULT_SORT = "timestamp"
 DEFAULT_RAW_DIR = PROJECT_ROOT / "data" / "raw"
 DEFAULT_PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+DEFAULT_DB_PATH = db.DEFAULT_DB_PATH
 
 
 @dataclass
@@ -85,6 +98,7 @@ def create_job(addresses: list[str], client: EtherscanClient, chain: str = DEFAU
         )
     with _jobs_lock:
         _jobs[job_id] = job
+    _persist(job)
 
     thread = threading.Thread(target=_execute_job, args=(job, client), daemon=True)
     thread.start()
@@ -93,13 +107,119 @@ def create_job(addresses: list[str], client: EtherscanClient, chain: str = DEFAU
 
 def get_job(job_id: str) -> Job | None:
     with _jobs_lock:
-        return _jobs.get(job_id)
+        job = _jobs.get(job_id)
+    if job is not None:
+        return job
+    return _load_job_from_store(job_id)
+
+
+def delete_job(job_id: str) -> bool:
+    """Löscht Metadaten (DB) sowie die zugehörigen Roh-/Export-Dateien
+    eines Jobs. Gibt True zurück, wenn der Job existierte. Läuft ein Job
+    gerade (queued/running), muss der Aufrufer das vorher separat prüfen -
+    diese Funktion entfernt bedingungslos, was sie findet."""
+    with _jobs_lock:
+        in_memory_job = _jobs.pop(job_id, None)
+    existed_in_db = db.delete_job(job_id, db_path=DEFAULT_DB_PATH)
+
+    for path in DEFAULT_PROCESSED_DIR.glob(f"transactions_{job_id}.*"):
+        path.unlink(missing_ok=True)
+    for path in DEFAULT_RAW_DIR.glob(f"{job_id}_*.json"):
+        path.unlink(missing_ok=True)
+
+    return in_memory_job is not None or existed_in_db
+
+
+def list_job_summaries() -> list[dict[str, Any]]:
+    """Liste aller bekannten Jobs (jede Chain, jeder Status) für die
+    Import-Historie, neueste zuerst - direkt aus der DB, nicht aus dem
+    In-Memory-Cache (damit auch nach einem Neustart vollständig)."""
+    rows = db.list_jobs(db_path=DEFAULT_DB_PATH)
+    return [
+        {
+            "job_id": row["id"],
+            "chain": row["chain"],
+            "addresses": row["addresses"],
+            "state": row["state"],
+            "error": row["error"],
+            "started_at": row["started_at"],
+            "finished_at": row["finished_at"],
+            "total_transactions": row["total_transactions"],
+            "unclassified_count": row["unclassified_count"],
+            "csv_available": bool(row["csv_path"]),
+            "json_available": bool(row["json_path"]),
+        }
+        for row in rows
+    ]
+
+
+def _job_meta(job: Job) -> dict[str, Any]:
+    with job.lock:
+        return {
+            "id": job.id,
+            "chain": job.chain,
+            "addresses": list(job.addresses),
+            "state": job.state,
+            "error": job.error,
+            "started_at": job.started_at.isoformat(),
+            "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+            "total_transactions": job.total_transactions,
+            "unclassified_count": job.unclassified_count,
+            "csv_path": str(job.csv_path) if job.csv_path else None,
+            "json_path": str(job.json_path) if job.json_path else None,
+        }
+
+
+def _persist(job: Job) -> None:
+    db.upsert_job(_job_meta(job), db_path=DEFAULT_DB_PATH)
+
+
+def _load_job_from_store(job_id: str) -> Job | None:
+    """Rekonstruiert einen Job aus der DB (Metadaten) + ggf. der bereits
+    vorhandenen JSON-Export-Datei (Transaktionen), wenn er nicht (mehr) im
+    In-Memory-Cache liegt - typischerweise nach einem Backend-Neustart.
+    Der pro-Kategorie-Fortschritt (address_progress) ist bewusst NICHT
+    persistiert (rein während des Laufs relevant) und bleibt nach
+    Rekonstruktion leer."""
+    meta = db.get_job(job_id, db_path=DEFAULT_DB_PATH)
+    if meta is None:
+        return None
+
+    csv_path = Path(meta["csv_path"]) if meta["csv_path"] else None
+    json_path = Path(meta["json_path"]) if meta["json_path"] else None
+
+    job = Job(
+        id=meta["id"],
+        addresses=meta["addresses"],
+        chain=meta["chain"],
+        state=meta["state"],
+        error=meta["error"],
+        started_at=datetime.fromisoformat(meta["started_at"]),
+        finished_at=datetime.fromisoformat(meta["finished_at"]) if meta["finished_at"] else None,
+        total_transactions=meta["total_transactions"],
+        unclassified_count=meta["unclassified_count"],
+        csv_path=csv_path,
+        json_path=json_path,
+    )
+    if job.state == "done" and json_path is not None and json_path.exists():
+        job.transactions = _load_transactions_from_json(json_path)
+
+    with _jobs_lock:
+        _jobs.setdefault(job_id, job)
+        return _jobs[job_id]
+
+
+def _load_transactions_from_json(json_path: Path) -> list[CanonicalTransaction]:
+    with json_path.open(encoding="utf-8") as f:
+        raw_entries = json.load(f)
+    return [CanonicalTransaction.model_validate(entry) for entry in raw_entries]
 
 
 def _execute_job(job: Job, client: EtherscanClient) -> None:
     with job.lock:
         job.state = "running"
         job.stage = "fetching"
+    _persist(job)
 
     def on_progress(event: dict[str, Any]) -> None:
         _handle_progress_event(job, event)
@@ -119,6 +239,7 @@ def _execute_job(job: Job, client: EtherscanClient) -> None:
             job.state = "error"
             job.error = str(exc)
             job.finished_at = datetime.now(timezone.utc)
+        _persist(job)
         return
 
     with job.lock:
@@ -130,6 +251,7 @@ def _execute_job(job: Job, client: EtherscanClient) -> None:
         job.state = "done"
         job.stage = None
         job.finished_at = datetime.now(timezone.utc)
+    _persist(job)
 
 
 def _handle_progress_event(job: Job, event: dict[str, Any]) -> None:

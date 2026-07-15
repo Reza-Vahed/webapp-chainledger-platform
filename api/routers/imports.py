@@ -14,7 +14,9 @@ from api import jobs
 from api.dependencies import get_import_client
 from api.schemas import (
     ImportCreatedResponse,
+    ImportListResponse,
     ImportRequest,
+    ImportSummary,
     JobStatusResponse,
     TransactionOut,
     TransactionsPage,
@@ -32,6 +34,22 @@ def create_import(
 ) -> ImportCreatedResponse:
     job_id = jobs.create_job(payload.addresses, client, payload.chain)
     return ImportCreatedResponse(job_id=job_id)
+
+
+@router.get("", response_model=ImportListResponse)
+def list_imports() -> ImportListResponse:
+    """Import-Historie (alle Chains, alle Status), neueste zuerst - für
+    die Wiedereröffnen-Ansicht im Frontend."""
+    return ImportListResponse(items=[ImportSummary(**item) for item in jobs.list_job_summaries()])
+
+
+@router.delete("/{job_id}", status_code=204)
+def delete_import(job_id: str) -> None:
+    job = jobs.get_job(job_id)
+    if job is not None and job.state in ("queued", "running"):
+        raise HTTPException(status_code=409, detail=f"Laufender Job kann nicht gelöscht werden (state={job.state})")
+    if not jobs.delete_job(job_id):
+        raise HTTPException(status_code=404, detail="Job nicht gefunden")
 
 
 @router.get("/{job_id}", response_model=JobStatusResponse)

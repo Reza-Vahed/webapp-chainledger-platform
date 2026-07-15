@@ -18,6 +18,11 @@ data/logs/*
 !data/processed/.gitkeep
 !data/logs/.gitkeep
 
+# Job-Metadaten-DB (siehe api/db.py) - enthaelt wallet-bezogene Import-Historie
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
 # Editor
 .vscode/
 .DS_Store
